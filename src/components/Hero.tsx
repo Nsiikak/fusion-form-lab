@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Search } from "lucide-react";
-import logo from "@/assets/plagohive-logo.jpeg";
+import logo from "@/assets/plagohive-logo.svg";
+import { Link } from "react-router-dom";
 
 export const Hero = () => {
   return (
@@ -39,21 +40,25 @@ export const Hero = () => {
 
           {/* CTA buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16 animate-slide-up [animation-delay:400ms]">
-            <Button 
-              size="lg" 
-              className="bg-white text-primary hover:bg-white/90 shadow-2xl hover:shadow-white/50 transition-all duration-300 hover:scale-105 text-lg px-8 py-6 group"
-            >
-              Find Vendors
-              <Search className="ml-2 h-5 w-5 group-hover:rotate-12 transition-transform" />
-            </Button>
-            <Button 
-              size="lg" 
-              variant="outline"
-              className="bg-white/10 text-white border-white/30 hover:bg-white/20 backdrop-blur-sm shadow-xl transition-all duration-300 hover:scale-105 text-lg px-8 py-6 group"
-            >
-              Become a Vendor
-              <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-            </Button>
+            <Link to="/vendor-search">
+              <Button 
+                size="lg" 
+                className="bg-white text-primary hover:bg-white/90 shadow-2xl hover:shadow-white/50 transition-all duration-300 hover:scale-105 text-lg px-8 py-6 group"
+              >
+                Find Vendors
+                <Search className="ml-2 h-5 w-5 group-hover:rotate-12 transition-transform" />
+              </Button>
+            </Link>
+            <Link to="/vendor-registration">
+              <Button 
+                size="lg" 
+                variant="outline"
+                className="bg-white/10 text-white border-white/30 hover:bg-white/20 backdrop-blur-sm shadow-xl transition-all duration-300 hover:scale-105 text-lg px-8 py-6 group"
+              >
+                Become a Vendor
+                <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+              </Button>
+            </Link>
           </div>
 
           {/* Stats */}

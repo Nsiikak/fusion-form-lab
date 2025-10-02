@@ -1,5 +1,5 @@
 import { Facebook, Instagram, Twitter, Linkedin, Mail } from "lucide-react";
-import logo from "@/assets/plagohive-logo.jpeg";
+import logo from "@/assets/plagohive-logo.svg";
 
 export const Footer = () => {
   const footerLinks = {
