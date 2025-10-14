@@ -1,21 +1,26 @@
-<svg width="200" height="60" viewBox="0 0 200 60" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- Chain icon -->
+<svg width="240" height="60" viewBox="0 0 240 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Chain link icon -->
   <g transform="translate(10, 15)">
-    <!-- Yellow link -->
-    <ellipse cx="8" cy="15" rx="6" ry="10" stroke="#F59E0B" stroke-width="3.5" fill="none" transform="rotate(-45 8 15)"/>
-    <!-- Red link -->
-    <ellipse cx="22" cy="15" rx="6" ry="10" stroke="#EF4444" stroke-width="3.5" fill="none" transform="rotate(45 22 15)"/>
-    <!-- Blue dot -->
-    <circle cx="15" cy="15" r="3" fill="#1E40AF"/>
-    <!-- Sparkles -->
-    <line x1="4" y1="10" x2="6" y2="8" stroke="#1E40AF" stroke-width="2" stroke-linecap="round"/>
-    <line x1="2" y1="15" x2="0" y2="15" stroke="#1E40AF" stroke-width="2" stroke-linecap="round"/>
-    <line x1="4" y1="20" x2="6" y2="22" stroke="#1E40AF" stroke-width="2" stroke-linecap="round"/>
-    <line x1="26" y1="10" x2="28" y2="8" stroke="#1E40AF" stroke-width="2" stroke-linecap="round"/>
-    <line x1="28" y1="15" x2="30" y2="15" stroke="#1E40AF" stroke-width="2" stroke-linecap="round"/>
-    <line x1="26" y1="20" x2="28" y2="22" stroke="#1E40AF" stroke-width="2" stroke-linecap="round"/>
+    <!-- Yellow/Gold chain link (left) -->
+    <ellipse cx="10" cy="15" rx="5" ry="9" stroke="#FDB022" stroke-width="4.5" fill="none" transform="rotate(-45 10 15)"/>
+    
+    <!-- Red/Coral chain link (right) -->
+    <ellipse cx="24" cy="15" rx="5" ry="9" stroke="#E74C3C" stroke-width="4.5" fill="none" transform="rotate(45 24 15)"/>
+    
+    <!-- Blue center dot -->
+    <circle cx="17" cy="15" r="3.5" fill="#1E40AF"/>
+    
+    <!-- Blue sparkles/connection effects (left side) -->
+    <line x1="6" y1="9" x2="3" y2="6" stroke="#1E40AF" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="2" y1="15" x2="-1" y2="15" stroke="#1E40AF" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="6" y1="21" x2="3" y2="24" stroke="#1E40AF" stroke-width="2.5" stroke-linecap="round"/>
+    
+    <!-- Blue sparkles/connection effects (right side) -->
+    <line x1="28" y1="9" x2="31" y2="6" stroke="#1E40AF" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="32" y1="15" x2="35" y2="15" stroke="#1E40AF" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="28" y1="21" x2="31" y2="24" stroke="#1E40AF" stroke-width="2.5" stroke-linecap="round"/>
   </g>
   
   <!-- Text "plagohive" -->
-  <text x="50" y="35" font-family="Inter, system-ui, sans-serif" font-size="24" font-weight="700" fill="#1E40AF">plagohive</text>
+  <text x="60" y="38" font-family="Inter, system-ui, sans-serif" font-size="28" font-weight="700" fill="#1E40AF">plagohive</text>
 </svg>
