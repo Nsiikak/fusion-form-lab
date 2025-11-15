@@ -1,6 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Utensils, Palette, Truck, Camera, Music, Sparkles, ArrowRight } from "lucide-react";
+import { Link } from "react-router-dom";
 
 export const Categories = () => {
   const categories = [
@@ -62,10 +63,13 @@ export const Categories = () => {
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto mb-12">
           {categories.map((category, index) => (
-            <Card 
+            <Link 
               key={index}
-              className="group relative overflow-hidden border-2 border-transparent hover:border-primary/30 transition-all duration-500 hover:-translate-y-2 hover:shadow-[var(--shadow-3d)] cursor-pointer bg-white"
+              to="/vendor-search"
             >
+              <Card 
+                className="group relative overflow-hidden border-2 border-transparent hover:border-primary/30 transition-all duration-500 hover:-translate-y-2 hover:shadow-[var(--shadow-3d)] cursor-pointer bg-white"
+              >
               <div className="p-6">
                 <div className={`w-14 h-14 ${category.color} rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300`}>
                   <category.icon className="h-7 w-7" />
@@ -90,17 +94,20 @@ export const Categories = () => {
               {/* Hover gradient overlay */}
               <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
             </Card>
+            </Link>
           ))}
         </div>
 
         <div className="text-center">
-          <Button 
-            size="lg"
-            className="bg-primary hover:bg-primary/90 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105 group"
-          >
-            Browse All Categories
-            <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-          </Button>
+          <Link to="/vendor-search">
+            <Button 
+              size="lg"
+              className="bg-primary hover:bg-primary/90 shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105 group"
+            >
+              Browse All Categories
+              <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+            </Button>
+          </Link>
         </div>
       </div>
     </section>

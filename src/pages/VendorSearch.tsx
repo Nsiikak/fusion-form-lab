@@ -4,10 +4,11 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
-import { Search, MapPin, Star, Filter } from "lucide-react";
+import { Search, MapPin, Star, Filter, LogOut } from "lucide-react";
 import { Footer } from "@/components/Footer";
 import logo from "@/assets/plagohive-logo.svg";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 
 const categories = [
   "All Categories", "Catering", "Decoration", "Photography", 
@@ -84,9 +85,16 @@ const vendors = [
 ];
 
 const VendorSearch = () => {
+  const { user, logout, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState("All Categories");
   const [budget, setBudget] = useState([300000]);
   const [searchQuery, setSearchQuery] = useState("");
+
+  const handleLogout = () => {
+    logout();
+    navigate("/");
+  };
 
   const filteredVendors = vendors.filter(vendor => {
     const matchesCategory = selectedCategory === "All Categories" || vendor.category === selectedCategory;
@@ -108,8 +116,24 @@ const VendorSearch = () => {
             <nav className="hidden md:flex items-center gap-6">
               <Link to="/vendor-search" className="text-sm font-medium hover:text-primary transition-colors">Find Vendors</Link>
               <Link to="/vendor-registration" className="text-sm font-medium hover:text-primary transition-colors">Become a Vendor</Link>
-              <Link to="/customer-dashboard" className="text-sm font-medium hover:text-primary transition-colors">Dashboard</Link>
-              <Button>Sign In</Button>
+              {isAuthenticated ? (
+                <>
+                  {user?.role === "customer" && (
+                    <Link to="/customer-dashboard" className="text-sm font-medium hover:text-primary transition-colors">Dashboard</Link>
+                  )}
+                  {user?.role === "vendor" && (
+                    <Link to="/vendor-dashboard" className="text-sm font-medium hover:text-primary transition-colors">Dashboard</Link>
+                  )}
+                  <Button variant="outline" onClick={handleLogout}>
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Logout
+                  </Button>
+                </>
+              ) : (
+                <Link to="/login">
+                  <Button>Sign In</Button>
+                </Link>
+              )}
             </nav>
           </div>
         </div>

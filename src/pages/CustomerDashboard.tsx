@@ -3,9 +3,10 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Footer } from "@/components/Footer";
-import { Calendar, MapPin, Star, Clock, CheckCircle2, Package } from "lucide-react";
+import { Calendar, MapPin, Star, Clock, CheckCircle2, Package, LogOut } from "lucide-react";
 import logo from "@/assets/plagohive-logo.svg";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 
 const upcomingEvents = [
   {
@@ -59,6 +60,14 @@ const bookings = [
 ];
 
 const CustomerDashboard = () => {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate("/");
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -71,7 +80,15 @@ const CustomerDashboard = () => {
             <nav className="hidden md:flex items-center gap-6">
               <Link to="/vendor-search" className="text-sm font-medium hover:text-primary transition-colors">Find Vendors</Link>
               <Link to="/customer-dashboard" className="text-sm font-medium text-primary">Dashboard</Link>
-              <Button>Profile</Button>
+              {user && (
+                <span className="text-sm text-muted-foreground">
+                  {user.full_name || user.email}
+                </span>
+              )}
+              <Button variant="outline" onClick={handleLogout}>
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
+              </Button>
             </nav>
           </div>
         </div>
@@ -81,7 +98,9 @@ const CustomerDashboard = () => {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
           {/* Welcome Section */}
           <div className="mb-12">
-            <h1 className="text-3xl sm:text-4xl font-bold mb-2">Welcome back, John!</h1>
+            <h1 className="text-3xl sm:text-4xl font-bold mb-2">
+              Welcome back, {user?.full_name || user?.email || "User"}!
+            </h1>
             <p className="text-muted-foreground">Manage your events and bookings</p>
           </div>
 
