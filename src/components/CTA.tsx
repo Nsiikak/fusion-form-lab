@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Sparkles } from "lucide-react";
+import { Link } from "react-router-dom";
 
 export const CTA = () => {
   return (
@@ -30,20 +31,24 @@ export const CTA = () => {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center animate-slide-up [animation-delay:400ms]">
-            <Button 
-              size="lg"
-              className="bg-white text-primary hover:bg-white/90 shadow-2xl hover:shadow-white/50 transition-all duration-300 hover:scale-105 text-lg px-10 py-7 group"
-            >
-              Start Planning Now
-              <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-            </Button>
-            <Button 
-              size="lg"
-              variant="outline"
-              className="bg-transparent text-white border-2 border-white/50 hover:bg-white/10 backdrop-blur-sm transition-all duration-300 hover:scale-105 text-lg px-10 py-7"
-            >
-              Learn More
-            </Button>
+            <Link to="/vendor-search">
+              <Button 
+                size="lg"
+                className="bg-white text-primary hover:bg-white/90 shadow-2xl hover:shadow-white/50 transition-all duration-300 hover:scale-105 text-lg px-10 py-7 group"
+              >
+                Start Planning Now
+                <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+              </Button>
+            </Link>
+            <Link to="/vendor-search">
+              <Button 
+                size="lg"
+                variant="outline"
+                className="bg-transparent text-white border-2 border-white/50 hover:bg-white/10 backdrop-blur-sm transition-all duration-300 hover:scale-105 text-lg px-10 py-7"
+              >
+                Learn More
+              </Button>
+            </Link>
           </div>
 
           <div className="mt-12 flex flex-wrap items-center justify-center gap-8 text-white/80 text-sm animate-slide-up [animation-delay:600ms]">

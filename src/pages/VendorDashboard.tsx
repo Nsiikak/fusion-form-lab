@@ -11,10 +11,12 @@ import {
   Users,
   CheckCircle2,
   Clock,
-  XCircle
+  XCircle,
+  LogOut
 } from "lucide-react";
 import logo from "@/assets/plagohive-logo.svg";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 
 const bookings = [
   { 
@@ -64,6 +66,14 @@ const reviews = [
 ];
 
 const VendorDashboard = () => {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate("/");
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -76,7 +86,15 @@ const VendorDashboard = () => {
             <nav className="hidden md:flex items-center gap-6">
               <Link to="/vendor-dashboard" className="text-sm font-medium text-primary">Dashboard</Link>
               <Link to="/vendor-search" className="text-sm font-medium hover:text-primary transition-colors">Browse Platform</Link>
-              <Button>Profile Settings</Button>
+              {user && (
+                <span className="text-sm text-muted-foreground">
+                  {user.full_name || user.email}
+                </span>
+              )}
+              <Button variant="outline" onClick={handleLogout}>
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
+              </Button>
             </nav>
           </div>
         </div>
