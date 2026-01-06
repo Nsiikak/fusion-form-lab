@@ -18,6 +18,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 CORS_ORIGINS = [
     "http://localhost:8080",
     "http://localhost:5173",
-    "http://localhost:3000"
+    "http://localhost:3000",
+    'https://plagohive.netlify.app'
 ]
 

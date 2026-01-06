@@ -1,88 +1,33 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
-import { Search, MapPin, Star, Filter, LogOut } from "lucide-react";
+import { Search, MapPin, Star, Filter, LogOut, Loader2 } from "lucide-react";
 import { Footer } from "@/components/Footer";
 import logo from "@/assets/plagohive-logo.svg";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { api } from "@/lib/api";
+import { toast } from "sonner";
 
 const categories = [
   "All Categories", "Catering", "Decoration", "Photography", 
   "Entertainment", "Logistics", "Venue"
 ];
 
-const vendors = [
-  { 
-    id: 1, 
-    name: "Premium Catering Co.", 
-    category: "Catering", 
-    rating: 4.8, 
-    reviews: 124, 
-    price: 150000, 
-    location: "Lagos",
-    verified: true,
-    image: "🍽️"
-  },
-  { 
-    id: 2, 
-    name: "Elegant Decor", 
-    category: "Decoration", 
-    rating: 4.9, 
-    reviews: 89, 
-    price: 80000, 
-    location: "Abuja",
-    verified: true,
-    image: "🎨"
-  },
-  { 
-    id: 3, 
-    name: "Snapshot Studios", 
-    category: "Photography", 
-    rating: 4.7, 
-    reviews: 156, 
-    price: 120000, 
-    location: "Lagos",
-    verified: true,
-    image: "📸"
-  },
-  { 
-    id: 4, 
-    name: "Party Vibes DJ", 
-    category: "Entertainment", 
-    rating: 4.6, 
-    reviews: 92, 
-    price: 100000, 
-    location: "Port Harcourt",
-    verified: false,
-    image: "🎵"
-  },
-  { 
-    id: 5, 
-    name: "Swift Logistics", 
-    category: "Logistics", 
-    rating: 4.8, 
-    reviews: 67, 
-    price: 60000, 
-    location: "Lagos",
-    verified: true,
-    image: "🚚"
-  },
-  { 
-    id: 6, 
-    name: "Grand Halls", 
-    category: "Venue", 
-    rating: 4.9, 
-    reviews: 201, 
-    price: 250000, 
-    location: "Abuja",
-    verified: true,
-    image: "🏛️"
-  },
-];
+// Map frontend category names to backend enum values
+const categoryMap: Record<string, string | null> = {
+  "All Categories": null,
+  "Catering": "catering",
+  "Decoration": "decoration",
+  "Photography": "photography",
+  "Entertainment": "entertainment",
+  "Logistics": "logistics",
+  "Venue": "venue",
+};
 
 const VendorSearch = () => {
   const { user, logout, isAuthenticated } = useAuth();
@@ -90,19 +35,79 @@ const VendorSearch = () => {
   const [selectedCategory, setSelectedCategory] = useState("All Categories");
   const [budget, setBudget] = useState([300000]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(1);
 
   const handleLogout = () => {
     logout();
     navigate("/");
   };
 
-  const filteredVendors = vendors.filter(vendor => {
-    const matchesCategory = selectedCategory === "All Categories" || vendor.category === selectedCategory;
-    const matchesBudget = vendor.price <= budget[0];
-    const matchesSearch = vendor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         vendor.category.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesCategory && matchesBudget && matchesSearch;
+  // Fetch vendors from API
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ["vendors", selectedCategory, budget, searchQuery, page],
+    queryFn: async () => {
+      const params: any = {
+        page,
+        limit: 20,
+      };
+
+      const categoryValue = categoryMap[selectedCategory];
+      if (categoryValue) {
+        params.category = categoryValue;
+      }
+
+      if (budget[0] < 500000) {
+        params.max_price = budget[0];
+      }
+
+      if (searchQuery.trim()) {
+        params.search = searchQuery.trim();
+      }
+
+      const response = await api.vendors.list(params);
+      return response;
+    },
   });
+
+  useEffect(() => {
+    // Reset to page 1 when filters change
+    setPage(1);
+  }, [selectedCategory, budget, searchQuery]);
+
+  const vendors = data?.vendors || [];
+  const totalVendors = data?.total || 0;
+
+  // Handle search input with debounce
+  const [searchInput, setSearchInput] = useState("");
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(searchInput);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  if (error) {
+    toast.error("Failed to load vendors. Please try again.");
+  }
+
+  // Map category enum to display name
+  const getCategoryDisplayName = (category: string) => {
+    const entry = Object.entries(categoryMap).find(([_, value]) => value === category);
+    return entry ? entry[0] : category;
+  };
+
+  // Get emoji for category
+  const getCategoryEmoji = (category: string) => {
+    const emojiMap: Record<string, string> = {
+      catering: "🍽️",
+      decoration: "🎨",
+      photography: "📸",
+      entertainment: "🎵",
+      logistics: "🚚",
+      venue: "🏛️",
+    };
+    return emojiMap[category] || "🏢";
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -119,7 +124,7 @@ const VendorSearch = () => {
               {isAuthenticated ? (
                 <>
                   {user?.role === "customer" && (
-                    <Link to="/customer-dashboard" className="text-sm font-medium hover:text-primary transition-colors">Dashboard</Link>
+              <Link to="/customer-dashboard" className="text-sm font-medium hover:text-primary transition-colors">Dashboard</Link>
                   )}
                   {user?.role === "vendor" && (
                     <Link to="/vendor-dashboard" className="text-sm font-medium hover:text-primary transition-colors">Dashboard</Link>
@@ -131,7 +136,7 @@ const VendorSearch = () => {
                 </>
               ) : (
                 <Link to="/login">
-                  <Button>Sign In</Button>
+              <Button>Sign In</Button>
                 </Link>
               )}
             </nav>
@@ -153,11 +158,11 @@ const VendorSearch = () => {
                 <Input 
                   placeholder="Search vendors or services..." 
                   className="pl-10"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
                 />
               </div>
-              <Button size="lg" className="px-8">
+              <Button size="lg" className="px-8" onClick={() => refetch()}>
                 <Filter className="mr-2 h-5 w-5" />
                 Filter
               </Button>
@@ -203,35 +208,45 @@ const VendorSearch = () => {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between mb-8">
             <h2 className="text-2xl font-bold">
-              {filteredVendors.length} Vendors Found
+              {isLoading ? "Loading..." : `${totalVendors} Vendor${totalVendors !== 1 ? 's' : ''} Found`}
             </h2>
           </div>
 
+          {isLoading ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : vendors.length === 0 ? (
+            <div className="text-center py-20">
+              <p className="text-muted-foreground text-lg">No vendors found. Try adjusting your filters.</p>
+            </div>
+          ) : (
+            <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredVendors.map((vendor) => (
+                {vendors.map((vendor: any) => (
               <Card 
                 key={vendor.id}
                 className="overflow-hidden hover:shadow-elevated transition-all duration-300 hover:-translate-y-1 cursor-pointer"
               >
                 <div className="aspect-video bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center text-6xl">
-                  {vendor.image}
+                      {getCategoryEmoji(vendor.category)}
                 </div>
                 <div className="p-6">
                   <div className="flex items-start justify-between mb-2">
                     <div>
-                      <h3 className="font-bold text-lg mb-1">{vendor.name}</h3>
-                      <Badge variant="secondary">{vendor.category}</Badge>
+                          <h3 className="font-bold text-lg mb-1">{vendor.business_name}</h3>
+                          <Badge variant="secondary">{getCategoryDisplayName(vendor.category)}</Badge>
                     </div>
-                    {vendor.verified && (
+                        {vendor.verification_status === "approved" && (
                       <Badge className="bg-accent">✓ Verified</Badge>
                     )}
                   </div>
                   
-                  <div className="flex items-center gap-2 mt-4 mb-3">
-                    <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                    <span className="font-semibold">{vendor.rating}</span>
-                    <span className="text-sm text-muted-foreground">({vendor.reviews} reviews)</span>
-                  </div>
+                      {vendor.description && (
+                        <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                          {vendor.description}
+                        </p>
+                      )}
 
                   <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
                     <MapPin className="h-4 w-4" />
@@ -241,7 +256,9 @@ const VendorSearch = () => {
                   <div className="flex items-center justify-between pt-4 border-t">
                     <div>
                       <p className="text-sm text-muted-foreground">Starting from</p>
-                      <p className="text-xl font-bold text-primary">₦{vendor.price.toLocaleString()}</p>
+                          <p className="text-xl font-bold text-primary">
+                            ₦{Number(vendor.starting_price).toLocaleString()}
+                          </p>
                     </div>
                     <Button>View Details</Button>
                   </div>
@@ -249,6 +266,31 @@ const VendorSearch = () => {
               </Card>
             ))}
           </div>
+
+              {/* Pagination */}
+              {data && data.total_pages > 1 && (
+                <div className="flex items-center justify-center gap-4 mt-8">
+                  <Button
+                    variant="outline"
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-sm text-muted-foreground">
+                    Page {page} of {data.total_pages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    onClick={() => setPage(p => Math.min(data.total_pages, p + 1))}
+                    disabled={page === data.total_pages}
+                  >
+                    Next
+                  </Button>
+                </div>
+              )}
+            </>
+          )}
         </div>
       </section>
 

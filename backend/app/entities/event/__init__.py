@@ -1,0 +1,2 @@
+# Event entity package
+
