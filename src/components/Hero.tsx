@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 
 export const Hero = () => {
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-to-br from-primary via-primary-glow to-accent bg-[length:200%_200%] animate-gradient-shift">
+    <section className="relative min-h-screen pt-20 flex items-center justify-center overflow-hidden bg-gradient-to-br from-primary via-primary-glow to-accent bg-[length:200%_200%] animate-gradient-shift">
       {/* Floating decorative elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-20 left-10 w-72 h-72 bg-secondary/20 rounded-full blur-3xl animate-float" />
@@ -15,14 +15,15 @@ export const Hero = () => {
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="max-w-5xl mx-auto text-center">
-          {/* Logo */}
+          {/* Logo
           <div className="mb-8 animate-scale-in">
-            <img 
-              src={logo} 
-              alt="Plagohive" 
-              className="h-16 sm:h-20 mx-auto drop-shadow-2xl"
+            <img
+              src="/Plagohive.svg"
+              alt="Plagohive"
+              // className="h-36 sm:h-48 mx-auto drop-shadow-2xl"
+              className="h-48 sm:h-64 md:h-72 mx-auto drop-shadow-2xl"
             />
-          </div>
+          </div> */}
 
           {/* Main headline */}
           <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-6 animate-slide-up leading-tight">
@@ -34,15 +35,15 @@ export const Hero = () => {
           </h1>
 
           <p className="text-lg sm:text-xl md:text-2xl text-white/90 mb-12 max-w-3xl mx-auto animate-slide-up [animation-delay:200ms]">
-            Africa's premier marketplace for planning unforgettable events. 
+            Africa's premier marketplace for planning unforgettable events.
             Find verified vendors, compare prices, and book with confidence.
           </p>
 
           {/* CTA buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16 animate-slide-up [animation-delay:400ms]">
             <Link to="/vendor-search">
-              <Button 
-                size="lg" 
+              <Button
+                size="lg"
                 className="bg-white text-primary hover:bg-white/90 shadow-2xl hover:shadow-white/50 transition-all duration-300 hover:scale-105 text-lg px-8 py-6 group"
               >
                 Find Vendors
@@ -50,8 +51,8 @@ export const Hero = () => {
               </Button>
             </Link>
             <Link to="/vendor-registration">
-              <Button 
-                size="lg" 
+              <Button
+                size="lg"
                 variant="outline"
                 className="bg-white/10 text-white border-white/30 hover:bg-white/20 backdrop-blur-sm shadow-xl transition-all duration-300 hover:scale-105 text-lg px-8 py-6 group"
               >
@@ -69,8 +70,8 @@ export const Hero = () => {
               { number: "4.8★", label: "Average Rating" },
               { number: "100%", label: "Secure Payments" },
             ].map((stat, index) => (
-              <div 
-                key={index} 
+              <div
+                key={index}
                 className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20 hover:bg-white/20 transition-all duration-300 hover:scale-105 hover:shadow-2xl"
               >
                 <div className="text-3xl font-bold text-white mb-1">{stat.number}</div>

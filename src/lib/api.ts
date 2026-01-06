@@ -121,6 +121,128 @@ export const api = {
       const response = await apiClient.put("/api/vendors/me", data);
       return response.data;
     },
+    list: async (params?: {
+      category?: string;
+      location?: string;
+      min_price?: number;
+      max_price?: number;
+      search?: string;
+      page?: number;
+      limit?: number;
+    }) => {
+      const response = await apiClient.get("/api/vendors", { params });
+      return response.data;
+    },
+    getById: async (vendorId: number) => {
+      const response = await apiClient.get(`/api/vendors/${vendorId}`);
+      return response.data;
+    },
+    getRecommended: async (limit?: number) => {
+      const params = limit ? { limit } : {};
+      const response = await apiClient.get("/api/vendors/recommended", { params });
+      return response.data;
+    },
+  },
+  bookings: {
+    create: async (data: {
+      vendor_id: number;
+      event_id?: number;
+      price: number;
+      event_date: string;
+      event_time?: string;
+      notes?: string;
+    }) => {
+      const response = await apiClient.post("/api/bookings", data);
+      return response.data;
+    },
+    list: async (status?: string) => {
+      const params = status ? { status } : {};
+      const response = await apiClient.get("/api/bookings", { params });
+      return response.data;
+    },
+    getById: async (bookingId: number) => {
+      const response = await apiClient.get(`/api/bookings/${bookingId}`);
+      return response.data;
+    },
+    updateStatus: async (bookingId: number, status: string) => {
+      const response = await apiClient.put(`/api/bookings/${bookingId}/status?new_status=${status}`);
+      return response.data;
+    },
+    delete: async (bookingId: number) => {
+      await apiClient.delete(`/api/bookings/${bookingId}`);
+    },
+  },
+  events: {
+    create: async (data: {
+      name: string;
+      date: string;
+      location: string;
+      description?: string;
+      total_budget?: number;
+    }) => {
+      const response = await apiClient.post("/api/events", data);
+      return response.data;
+    },
+    list: async (status?: string) => {
+      const params = status ? { status } : {};
+      const response = await apiClient.get("/api/events", { params });
+      return response.data;
+    },
+    getById: async (eventId: number) => {
+      const response = await apiClient.get(`/api/events/${eventId}`);
+      return response.data;
+    },
+    update: async (eventId: number, data: any) => {
+      const response = await apiClient.put(`/api/events/${eventId}`, data);
+      return response.data;
+    },
+    delete: async (eventId: number) => {
+      await apiClient.delete(`/api/events/${eventId}`);
+    },
+    getBookings: async (eventId: number) => {
+      const response = await apiClient.get(`/api/events/${eventId}/bookings`);
+      return response.data;
+    },
+  },
+  reviews: {
+    create: async (data: {
+      vendor_id: number;
+      booking_id?: number;
+      rating: number;
+      comment?: string;
+    }) => {
+      const response = await apiClient.post("/api/reviews", data);
+      return response.data;
+    },
+    getVendorReviews: async (vendorId: number) => {
+      const response = await apiClient.get(`/api/reviews/vendor/${vendorId}`);
+      return response.data;
+    },
+    getVendorRating: async (vendorId: number) => {
+      const response = await apiClient.get(`/api/reviews/vendor/${vendorId}/rating`);
+      return response.data;
+    },
+    list: async () => {
+      const response = await apiClient.get("/api/reviews");
+      return response.data;
+    },
+    update: async (reviewId: number, data: any) => {
+      const response = await apiClient.put(`/api/reviews/${reviewId}`, data);
+      return response.data;
+    },
+    delete: async (reviewId: number) => {
+      await apiClient.delete(`/api/reviews/${reviewId}`);
+    },
+  },
+  stats: {
+    getCustomerStats: async () => {
+      const response = await apiClient.get("/api/stats/customer");
+      return response.data;
+    },
+    getVendorStats: async () => {
+      const response = await apiClient.get("/api/stats/vendor");
+      return response.data;
+    },
   },
 };
 

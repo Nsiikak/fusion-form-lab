@@ -1,6 +1,8 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import or_, and_
+from typing import List, Optional
 from fastapi import HTTPException, status
-from app.entities.vendor.model import Vendor, VerificationStatus
+from app.entities.vendor.model import Vendor, VerificationStatus, VendorCategory
 from app.entities.vendor.schema import VendorCreate
 from app.entities.user.model import User, UserRole
 from app.entities.user.service import UserService
@@ -84,4 +86,60 @@ class VendorService:
         db.commit()
         db.refresh(vendor)
         return vendor
+    
+    @staticmethod
+    def list_vendors(
+        db: Session,
+        category: Optional[VendorCategory] = None,
+        location: Optional[str] = None,
+        min_price: Optional[float] = None,
+        max_price: Optional[float] = None,
+        search: Optional[str] = None,
+        page: int = 1,
+        limit: int = 20,
+        only_verified: bool = True
+    ) -> tuple[List[Vendor], int]:
+        """List vendors with filters and pagination"""
+        query = db.query(Vendor).filter(Vendor.is_active == True)
+        
+        # Only show approved vendors by default
+        if only_verified:
+            query = query.filter(Vendor.verification_status == VerificationStatus.APPROVED)
+        
+        # Apply filters
+        if category:
+            query = query.filter(Vendor.category == category)
+        
+        if location:
+            query = query.filter(Vendor.location.ilike(f"%{location}%"))
+        
+        if min_price is not None:
+            query = query.filter(Vendor.starting_price >= min_price)
+        
+        if max_price is not None:
+            query = query.filter(Vendor.starting_price <= max_price)
+        
+        if search:
+            search_term = f"%{search}%"
+            query = query.filter(
+                or_(
+                    Vendor.business_name.ilike(search_term),
+                    Vendor.description.ilike(search_term),
+                    Vendor.location.ilike(search_term)
+                )
+            )
+        
+        # Get total count before pagination
+        total = query.count()
+        
+        # Apply pagination
+        offset = (page - 1) * limit
+        vendors = query.order_by(Vendor.created_at.desc()).offset(offset).limit(limit).all()
+        
+        return vendors, total
+    
+    @staticmethod
+    def get_vendor_with_reviews(db: Session, vendor_id: int) -> Optional[Vendor]:
+        """Get vendor by ID with related data"""
+        return db.query(Vendor).filter(Vendor.id == vendor_id).first()
 

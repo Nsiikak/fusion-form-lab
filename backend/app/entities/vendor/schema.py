@@ -40,3 +40,10 @@ class VendorResponse(VendorBase):
     class Config:
         from_attributes = True
 
+class VendorListResponse(BaseModel):
+    vendors: list[VendorResponse]
+    total: int
+    page: int
+    limit: int
+    total_pages: int
+

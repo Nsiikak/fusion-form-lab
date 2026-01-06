@@ -1,5 +1,5 @@
-import { Facebook, Instagram, Twitter, Linkedin, Mail } from "lucide-react";
-import logo from "@/assets/plagohive-logo.svg";
+import { Facebook, Instagram, Twitter, Linkedin, Mail, Hexagon } from "lucide-react";
+import logo from "@/assets/plagohive-icon.svg";
 
 export const Footer = () => {
   const footerLinks = {
@@ -15,13 +15,15 @@ export const Footer = () => {
         <div className="grid md:grid-cols-2 lg:grid-cols-6 gap-8 mb-12">
           {/* Brand section */}
           <div className="lg:col-span-2">
-            <img 
-              src={logo} 
-              alt="Plagohive" 
-              className="h-12 mb-4 brightness-0 invert"
-            />
+            {/* Text + Icon row */}
+            <div className="flex items-center gap-2 mb-4">
+              <p className="text-sm uppercase tracking-wider text-white/80">
+                Stay connected with the Hive 🐝
+              </p>
+              {/* <Hexagon className="h-5 w-5 text-primary" /> */}
+            </div>
             <p className="text-white/70 mb-6 text-sm leading-relaxed">
-              Africa's premier marketplace connecting event planners with trusted, verified vendors. 
+              Africa's premier marketplace connecting event planners with trusted, verified vendors.
               Plan your perfect event with confidence.
             </p>
             <div className="flex gap-3">
@@ -44,8 +46,8 @@ export const Footer = () => {
               <ul className="space-y-2">
                 {links.map((link) => (
                   <li key={link}>
-                    <a 
-                      href="#" 
+                    <a
+                      href="#"
                       className="text-white/70 hover:text-primary text-sm transition-colors duration-300"
                     >
                       {link}
@@ -82,7 +84,7 @@ export const Footer = () => {
 
         {/* Bottom bar */}
         <div className="border-t border-white/10 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-white/60">
-          <p>© 2024 Plagohive. All rights reserved.</p>
+          <p>© 2026 Plagohive. All rights reserved.</p>
           <div className="flex gap-6">
             <a href="#" className="hover:text-primary transition-colors">Privacy</a>
             <a href="#" className="hover:text-primary transition-colors">Terms</a>
