@@ -49,7 +49,7 @@ export const Header = () => {
                                 Login
                             </Button>
                         </Link>
-                        <Link to="/signup">
+                        <Link to="/register">
                             <Button className="bg-white text-primary hover:bg-white/90 shadow-lg hover:shadow-white/50 transition-all duration-300 hover:scale-105">
                                 Sign Up
                             </Button>
