@@ -58,7 +58,7 @@ const Login = () => {
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
           <Link to="/">
-            <img src={logo} alt="Plagohive" className="h-12 mx-auto mb-4" />
+            <img src={logo} alt="Plagohive" className="h-40 mx-auto mb-4" />
           </Link>
           <h1 className="text-3xl font-bold mb-2">Welcome back</h1>
           <p className="text-muted-foreground">Sign in to your account</p>

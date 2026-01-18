@@ -4,11 +4,11 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Footer } from "@/components/Footer";
-import { 
-  Calendar, 
-  DollarSign, 
-  Star, 
-  TrendingUp, 
+import {
+  Calendar,
+  DollarSign,
+  Star,
+  TrendingUp,
   Users,
   CheckCircle2,
   Clock,
@@ -16,7 +16,7 @@ import {
   LogOut,
   Loader2
 } from "lucide-react";
-import logo from "@/assets/plagohive-logo.svg";
+import logo from "@/assets/plagohive-icon.svg";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api";
@@ -130,7 +130,7 @@ const VendorDashboard = () => {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <Link to="/">
-              <img src={logo} alt="Plagohive" className="h-10" />
+              <img src={logo} alt="Plagohive" className="h-14" />
             </Link>
             <nav className="hidden md:flex items-center gap-6">
               <Link to="/vendor-dashboard" className="text-sm font-medium text-primary">Dashboard</Link>
@@ -260,11 +260,11 @@ const VendorDashboard = () => {
                         <div className="space-y-3 flex-1">
                           <div className="flex items-center gap-3 flex-wrap">
                             <h3 className="text-lg font-bold">{booking.customer_name || booking.customer_email || `Customer #${booking.customer_id}`}</h3>
-                            <Badge 
+                            <Badge
                               variant={
-                                booking.status === "confirmed" ? "default" : 
-                                booking.status === "pending" ? "secondary" : 
-                                "outline"
+                                booking.status === "confirmed" ? "default" :
+                                  booking.status === "pending" ? "secondary" :
+                                    "outline"
                               }
                             >
                               {booking.status === "confirmed" && <CheckCircle2 className="h-3 w-3 mr-1" />}
@@ -273,7 +273,7 @@ const VendorDashboard = () => {
                               {booking.status}
                             </Badge>
                           </div>
-                          
+
                           <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                             <div className="flex items-center gap-2">
                               <Calendar className="h-4 w-4" />
@@ -303,8 +303,8 @@ const VendorDashboard = () => {
                           <div className="flex gap-2">
                             {booking.status === "pending" && (
                               <>
-                                <Button 
-                                  size="sm" 
+                                <Button
+                                  size="sm"
                                   variant="outline"
                                   onClick={() => handleDecline(booking.id)}
                                   disabled={updateBookingStatus.isPending}
@@ -312,7 +312,7 @@ const VendorDashboard = () => {
                                   <XCircle className="h-4 w-4 mr-1" />
                                   Decline
                                 </Button>
-                                <Button 
+                                <Button
                                   size="sm"
                                   onClick={() => handleAccept(booking.id)}
                                   disabled={updateBookingStatus.isPending}
@@ -361,13 +361,12 @@ const VendorDashboard = () => {
                           <h3 className="font-bold mb-1">Customer #{review.customer_id}</h3>
                           <div className="flex items-center gap-1">
                             {[...Array(5)].map((_, i) => (
-                              <Star 
+                              <Star
                                 key={i}
-                                className={`h-4 w-4 ${
-                                  i < review.rating 
-                                    ? 'fill-yellow-400 text-yellow-400' 
-                                    : 'text-gray-300'
-                                }`}
+                                className={`h-4 w-4 ${i < review.rating
+                                  ? 'fill-yellow-400 text-yellow-400'
+                                  : 'text-gray-300'
+                                  }`}
                               />
                             ))}
                           </div>

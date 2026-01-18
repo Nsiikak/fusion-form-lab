@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Footer } from "@/components/Footer";
 import { Calendar, MapPin, Star, Clock, CheckCircle2, Package, LogOut, Loader2 } from "lucide-react";
-import logo from "@/assets/plagohive-logo.svg";
+import logo from "@/assets/plagohive-icon.svg";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api";
@@ -151,7 +151,7 @@ const CustomerDashboard = () => {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <Link to="/">
-              <img src={logo} alt="Plagohive" className="h-10" />
+              <img src={logo} alt="Plagohive" className="h-12" />
             </Link>
             <nav className="hidden md:flex items-center gap-6">
               <Link to="/vendor-search" className="text-sm font-medium hover:text-primary transition-colors">Find Vendors</Link>
@@ -264,7 +264,7 @@ const CustomerDashboard = () => {
                     const eventBookings = bookings.filter((b: any) => b.event_id === event.id);
                     const confirmedEventBookings = eventBookings.filter((b: any) => b.status === "confirmed");
                     const totalCost = confirmedEventBookings.reduce((sum: number, b: any) => sum + Number(b.price), 0);
-                    
+
                     return (
                       <Card key={event.id} className="p-6 hover:shadow-elevated transition-all">
                         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -275,7 +275,7 @@ const CustomerDashboard = () => {
                                 {event.status}
                               </Badge>
                             </div>
-                            
+
                             <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                               <div className="flex items-center gap-2">
                                 <Calendar className="h-4 w-4" />
@@ -338,7 +338,7 @@ const CustomerDashboard = () => {
                               {booking.status}
                             </Badge>
                           </div>
-                          
+
                           <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                             <div className="flex items-center gap-2">
                               <Calendar className="h-4 w-4" />
@@ -359,8 +359,8 @@ const CustomerDashboard = () => {
                           </div>
                           <div className="flex gap-2">
                             {booking.status === "pending" && (
-                              <Button 
-                                variant="outline" 
+                              <Button
+                                variant="outline"
                                 size="sm"
                                 onClick={async () => {
                                   try {
