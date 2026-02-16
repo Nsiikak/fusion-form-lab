@@ -14,7 +14,7 @@ import { api } from "@/lib/api";
 import { toast } from "sonner";
 
 const categories = [
-  "All Categories", "Catering", "Decoration", "Photography", 
+  "All Categories", "Catering", "Decoration", "Photography",
   "Entertainment", "Logistics", "Venue"
 ];
 
@@ -124,7 +124,7 @@ const VendorSearch = () => {
               {isAuthenticated ? (
                 <>
                   {user?.role === "customer" && (
-              <Link to="/customer-dashboard" className="text-sm font-medium hover:text-primary transition-colors">Dashboard</Link>
+                    <Link to="/customer-dashboard" className="text-sm font-medium hover:text-primary transition-colors">Dashboard</Link>
                   )}
                   {user?.role === "vendor" && (
                     <Link to="/vendor-dashboard" className="text-sm font-medium hover:text-primary transition-colors">Dashboard</Link>
@@ -136,7 +136,7 @@ const VendorSearch = () => {
                 </>
               ) : (
                 <Link to="/login">
-              <Button>Sign In</Button>
+                  <Button>Sign In</Button>
                 </Link>
               )}
             </nav>
@@ -150,13 +150,13 @@ const VendorSearch = () => {
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white text-center mb-8">
             Find Your Perfect Event Vendors
           </h1>
-          
+
           <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-2xl p-6">
             <div className="flex gap-4 mb-6">
               <div className="flex-1 relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                <Input 
-                  placeholder="Search vendors or services..." 
+                <Input
+                  placeholder="Search vendors or services..."
                   className="pl-10"
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
@@ -171,8 +171,8 @@ const VendorSearch = () => {
             <div className="space-y-4">
               <div>
                 <label className="text-sm font-medium mb-2 block">Budget: ₦{budget[0].toLocaleString()}</label>
-                <Slider 
-                  value={budget} 
+                <Slider
+                  value={budget}
                   onValueChange={setBudget}
                   max={500000}
                   min={10000}
@@ -222,50 +222,52 @@ const VendorSearch = () => {
             </div>
           ) : (
             <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {vendors.map((vendor: any) => (
-              <Card 
-                key={vendor.id}
-                className="overflow-hidden hover:shadow-elevated transition-all duration-300 hover:-translate-y-1 cursor-pointer"
-              >
-                <div className="aspect-video bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center text-6xl">
+                  <Card
+                    key={vendor.id}
+                    className="overflow-hidden hover:shadow-elevated transition-all duration-300 hover:-translate-y-1 cursor-pointer"
+                  >
+                    <div className="aspect-video bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center text-6xl">
                       {getCategoryEmoji(vendor.category)}
-                </div>
-                <div className="p-6">
-                  <div className="flex items-start justify-between mb-2">
-                    <div>
+                    </div>
+                    <div className="p-6">
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
                           <h3 className="font-bold text-lg mb-1">{vendor.business_name}</h3>
                           <Badge variant="secondary">{getCategoryDisplayName(vendor.category)}</Badge>
-                    </div>
+                        </div>
                         {vendor.verification_status === "approved" && (
-                      <Badge className="bg-accent">✓ Verified</Badge>
-                    )}
-                  </div>
-                  
+                          <Badge className="bg-accent">✓ Verified</Badge>
+                        )}
+                      </div>
+
                       {vendor.description && (
                         <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
                           {vendor.description}
                         </p>
                       )}
 
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-                    <MapPin className="h-4 w-4" />
-                    {vendor.location}
-                  </div>
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+                        <MapPin className="h-4 w-4" />
+                        {vendor.location}
+                      </div>
 
-                  <div className="flex items-center justify-between pt-4 border-t">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Starting from</p>
+                      <div className="flex items-center justify-between pt-4 border-t">
+                        <div>
+                          <p className="text-sm text-muted-foreground">Starting from</p>
                           <p className="text-xl font-bold text-primary">
                             ₦{Number(vendor.starting_price).toLocaleString()}
                           </p>
+                        </div>
+                        <Link to={`/vendors/${vendor.id}`}>
+                          <Button>View Details</Button>
+                        </Link>
+                      </div>
                     </div>
-                    <Button>View Details</Button>
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
+                  </Card>
+                ))}
+              </div>
 
               {/* Pagination */}
               {data && data.total_pages > 1 && (
@@ -294,7 +296,7 @@ const VendorSearch = () => {
         </div>
       </section>
 
-      <Footer />
+
     </div>
   );
 };

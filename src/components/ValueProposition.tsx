@@ -3,11 +3,14 @@ import { ShoppingBag, Users, Shield, TrendingUp } from "lucide-react";
 
 export const ValueProposition = () => {
   return (
-    <section className="py-20 md:py-32 bg-muted/30">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+    <section className="py-20 md:py-32 bg-gradient-to-b from-background to-accent/5 relative overflow-hidden">
+      {/* Decorative elements */}
+      <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
+
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="text-center mb-16">
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 text-foreground">
-            Why Choose <span className="text-primary">Plagohive</span>?
+            Why Choose <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent">Plagohive</span>?
           </h2>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             We're revolutionizing how events are planned across Africa
@@ -16,9 +19,9 @@ export const ValueProposition = () => {
 
         <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto">
           {/* For Customers */}
-          <Card className="p-8 hover:shadow-[var(--shadow-3d)] transition-all duration-500 hover:-translate-y-2 border-2 hover:border-primary/50 bg-gradient-to-br from-white to-muted/50">
+          <Card className="p-8 hover:shadow-[var(--shadow-3d)] transition-all duration-500 hover:-translate-y-2 border border-border/50 hover:border-primary/50 bg-white/60 backdrop-blur-sm group">
             <div className="mb-6">
-              <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-4">
+              <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
                 <ShoppingBag className="h-8 w-8 text-primary" />
               </div>
               <h3 className="text-2xl font-bold mb-2 text-foreground">For Event Planners</h3>
@@ -45,9 +48,9 @@ export const ValueProposition = () => {
           </Card>
 
           {/* For Vendors */}
-          <Card className="p-8 hover:shadow-[var(--shadow-3d)] transition-all duration-500 hover:-translate-y-2 border-2 hover:border-accent/50 bg-gradient-to-br from-white to-accent/5">
+          <Card className="p-8 hover:shadow-[var(--shadow-3d)] transition-all duration-500 hover:-translate-y-2 border border-border/50 hover:border-accent/50 bg-white/60 backdrop-blur-sm group">
             <div className="mb-6">
-              <div className="w-16 h-16 bg-accent/10 rounded-2xl flex items-center justify-center mb-4">
+              <div className="w-16 h-16 bg-accent/10 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
                 <TrendingUp className="h-8 w-8 text-accent" />
               </div>
               <h3 className="text-2xl font-bold mb-2 text-foreground">For Vendors</h3>
@@ -81,9 +84,9 @@ export const ValueProposition = () => {
             { icon: Users, label: "Trusted Community", color: "secondary" },
             { icon: TrendingUp, label: "Growing Network", color: "accent" },
           ].map((item, index) => (
-            <div 
+            <div
               key={index}
-              className="flex flex-col items-center gap-3 p-6 rounded-2xl bg-white hover:shadow-[var(--shadow-elevated)] transition-all duration-300 hover:scale-105"
+              className="flex flex-col items-center gap-3 p-6 rounded-2xl bg-white/50 backdrop-blur-sm border border-transparent hover:border-primary/20 hover:shadow-[var(--shadow-elevated)] transition-all duration-300 hover:scale-105"
             >
               <div className={`w-12 h-12 bg-${item.color}/10 rounded-full flex items-center justify-center`}>
                 <item.icon className={`h-6 w-6 text-${item.color}`} />

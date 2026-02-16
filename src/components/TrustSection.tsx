@@ -33,7 +33,7 @@ export const TrustSection = () => {
     <section className="py-20 md:py-32 bg-background relative overflow-hidden">
       {/* Decorative background */}
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5" />
-      
+
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
@@ -51,20 +51,20 @@ export const TrustSection = () => {
 
           <div className="grid md:grid-cols-2 gap-6">
             {features.map((feature, index) => (
-              <Card 
+              <Card
                 key={index}
-                className="relative overflow-hidden border-2 border-transparent hover:border-primary/30 transition-all duration-500 hover:shadow-[var(--shadow-elevated)] group"
+                className="relative overflow-hidden border border-border/50 hover:border-primary/30 transition-all duration-500 hover:shadow-[var(--shadow-elevated)] group bg-white/50 backdrop-blur-sm"
               >
                 <div className={`absolute inset-0 bg-gradient-to-br ${feature.gradient} opacity-50 group-hover:opacity-100 transition-opacity duration-500`} />
-                
+
                 <div className="relative p-8">
                   <div className="flex items-start gap-4">
                     <div className="flex-shrink-0">
-                      <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                      <div className="w-12 h-12 bg-white/50 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-sm">
                         <feature.icon className="h-6 w-6 text-primary" />
                       </div>
                     </div>
-                    
+
                     <div>
                       <h3 className="text-xl font-bold mb-2 text-foreground">
                         {feature.title}
@@ -80,23 +80,24 @@ export const TrustSection = () => {
           </div>
 
           {/* Stats bar */}
-          <div className="mt-16 bg-gradient-to-r from-primary via-primary-glow to-accent rounded-3xl p-8 md:p-12 text-white shadow-2xl">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-              <div>
+          <div className="mt-16 bg-gradient-to-r from-primary via-primary-glow to-accent rounded-3xl p-8 md:p-12 text-white shadow-2xl relative overflow-hidden group">
+            <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center relative z-10">
+              <div className="transform transition-transform duration-300 hover:scale-105">
                 <div className="text-4xl md:text-5xl font-bold mb-2">98%</div>
-                <div className="text-white/80 text-sm">Satisfaction Rate</div>
+                <div className="text-white/80 text-sm font-medium">Satisfaction Rate</div>
               </div>
-              <div>
+              <div className="transform transition-transform duration-300 hover:scale-105">
                 <div className="text-4xl md:text-5xl font-bold mb-2">24/7</div>
-                <div className="text-white/80 text-sm">Customer Support</div>
+                <div className="text-white/80 text-sm font-medium">Customer Support</div>
               </div>
-              <div>
+              <div className="transform transition-transform duration-300 hover:scale-105">
                 <div className="text-4xl md:text-5xl font-bold mb-2">50K+</div>
-                <div className="text-white/80 text-sm">Happy Customers</div>
+                <div className="text-white/80 text-sm font-medium">Happy Customers</div>
               </div>
-              <div>
+              <div className="transform transition-transform duration-300 hover:scale-105">
                 <div className="text-4xl md:text-5xl font-bold mb-2">100%</div>
-                <div className="text-white/80 text-sm">Money-back Guarantee</div>
+                <div className="text-white/80 text-sm font-medium">Money-back Guarantee</div>
               </div>
             </div>
           </div>

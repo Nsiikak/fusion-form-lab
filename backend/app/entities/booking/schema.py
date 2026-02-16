@@ -13,7 +13,7 @@ class BookingBase(BaseModel):
     notes: Optional[str] = None
 
 class BookingCreate(BookingBase):
-    pass
+    payment_reference: Optional[str] = None
 
 class BookingUpdate(BaseModel):
     status: Optional[BookingStatus] = None

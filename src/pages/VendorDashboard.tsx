@@ -14,7 +14,9 @@ import {
   Clock,
   XCircle,
   LogOut,
-  Loader2
+  Loader2,
+  Settings,
+  Package
 } from "lucide-react";
 import logo from "@/assets/plagohive-icon.svg";
 import { Link, useNavigate } from "react-router-dom";
@@ -124,23 +126,26 @@ const VendorDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/20 via-background to-background">
       {/* Header */}
-      <header className="bg-white border-b">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-white/20 shadow-sm">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-3">
           <div className="flex items-center justify-between">
             <Link to="/">
-              <img src={logo} alt="Plagohive" className="h-14" />
+              <img src={logo} alt="Plagohive" className="h-10" />
             </Link>
             <nav className="hidden md:flex items-center gap-6">
-              <Link to="/vendor-dashboard" className="text-sm font-medium text-primary">Dashboard</Link>
-              <Link to="/vendor-search" className="text-sm font-medium hover:text-primary transition-colors">Browse Platform</Link>
+              <Link to="/vendor-dashboard" className="text-sm font-medium text-primary bg-primary/10 px-3 py-1.5 rounded-full">Dashboard</Link>
+              <Link to="/profile" className="text-sm font-medium hover:text-primary transition-colors">Profile</Link>
               {user && (
-                <span className="text-sm text-muted-foreground">
-                  {user.full_name || user.email}
+                <span className="text-sm text-muted-foreground flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-secondary to-accent text-white flex items-center justify-center font-bold shadow-sm">
+                    {user.business_name?.[0] || user.full_name?.[0] || "V"}
+                  </div>
+                  <span className="hidden sm:inline">{user.business_name || user.full_name}</span>
                 </span>
               )}
-              <Button variant="outline" onClick={handleLogout}>
+              <Button variant="ghost" size="sm" onClick={handleLogout} className="text-destructive hover:text-destructive hover:bg-destructive/10">
                 <LogOut className="h-4 w-4 mr-2" />
                 Logout
               </Button>
@@ -149,123 +154,140 @@ const VendorDashboard = () => {
         </div>
       </header>
 
-      <section className="py-16">
+      <section className="pt-32 pb-16">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
           {/* Welcome Section */}
-          <div className="mb-12">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="mb-12 animate-fade-in-up">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
-                <h1 className="text-3xl sm:text-4xl font-bold mb-2">
-                  {vendorProfile?.business_name || "Your Business"}
+                <h1 className="text-3xl sm:text-4xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-primary to-accent">
+                  Vendor Dashboard
                 </h1>
-                <p className="text-muted-foreground">Manage your bookings and grow your business</p>
+                <p className="text-muted-foreground text-lg">
+                  Welcome back, <span className="font-semibold text-foreground">{user?.business_name || "Partner"}</span>
+                </p>
               </div>
-              {vendorProfile?.verification_status === "approved" && (
-                <Badge className="w-fit bg-accent text-lg px-4 py-2">
-                  ✓ Verified Vendor
-                </Badge>
-              )}
+              <Button className="shadow-lg hover:shadow-primary/30 bg-primary hover:bg-primary/90 text-white">
+                <Settings className="mr-2 h-4 w-4" />
+                Manage Profile
+              </Button>
             </div>
           </div>
 
           {/* Quick Stats */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 mb-12">
-            <Card className="p-6 hover:shadow-lg transition-shadow">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12 animate-fade-in-up [animation-delay:200ms]">
+            <Card className="glass-panel p-6 hover:shadow-[var(--shadow-elevated)] transition-all bg-white/80 hover:bg-white/90 border-primary/10">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Total Earnings</p>
-                  <p className="text-2xl font-bold text-primary">
-                    {statsLoading ? "..." : `₦${(stats?.total_earnings || 0) / 1000000 >= 1 ? ((stats?.total_earnings || 0) / 1000000).toFixed(1) + "M" : ((stats?.total_earnings || 0) / 1000).toFixed(0) + "K"}`}
-                  </p>
+                  <p className="text-sm font-medium text-muted-foreground mb-1">Total Earnings</p>
+                  {statsLoading ? (
+                    <div className="h-9 w-24 bg-gray-200 animate-pulse rounded" />
+                  ) : (
+                    <p className="text-3xl font-bold text-primary">
+                      ₦{(stats?.total_earnings || 0).toLocaleString()}
+                    </p>
+                  )}
                 </div>
-                <DollarSign className="h-10 w-10 text-primary/20" />
+                <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center shadow-sm">
+                  <DollarSign className="h-6 w-6 text-primary" />
+                </div>
               </div>
             </Card>
 
-            <Card className="p-6 hover:shadow-lg transition-shadow">
+            <Card className="glass-panel p-6 hover:shadow-[var(--shadow-elevated)] transition-all bg-white/80 hover:bg-white/90 border-accent/10">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Active Bookings</p>
-                  <p className="text-2xl font-bold text-accent">
-                    {statsLoading ? "..." : (stats?.active_bookings || 0)}
-                  </p>
+                  <p className="text-sm font-medium text-muted-foreground mb-1">Bookings</p>
+                  {statsLoading ? (
+                    <div className="h-9 w-16 bg-gray-200 animate-pulse rounded" />
+                  ) : (
+                    <p className="text-3xl font-bold text-accent">
+                      {stats?.active_bookings || 0}
+                    </p>
+                  )}
                 </div>
-                <Calendar className="h-10 w-10 text-accent/20" />
+                <div className="w-12 h-12 bg-accent/10 rounded-2xl flex items-center justify-center shadow-sm">
+                  <Package className="h-6 w-6 text-accent" />
+                </div>
               </div>
             </Card>
 
-            <Card className="p-6 hover:shadow-lg transition-shadow">
+            <Card className="glass-panel p-6 hover:shadow-[var(--shadow-elevated)] transition-all bg-white/80 hover:bg-white/90 border-secondary/10">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Rating</p>
-                  <p className="text-2xl font-bold text-secondary">
-                    {statsLoading ? "..." : (stats?.average_rating > 0 ? `${stats.average_rating.toFixed(1)}★` : "N/A")}
-                  </p>
+                  <p className="text-sm font-medium text-muted-foreground mb-1">Rating</p>
+                  {statsLoading ? (
+                    <div className="h-9 w-16 bg-gray-200 animate-pulse rounded" />
+                  ) : (
+                    <p className="text-3xl font-bold text-secondary">
+                      {stats?.average_rating > 0 ? stats.average_rating.toFixed(1) : "N/A"}
+                    </p>
+                  )}
                 </div>
-                <Star className="h-10 w-10 text-secondary/20" />
+                <div className="w-12 h-12 bg-secondary/10 rounded-2xl flex items-center justify-center shadow-sm">
+                  <Star className="h-6 w-6 text-secondary fill-secondary" />
+                </div>
               </div>
             </Card>
 
-            <Card className="p-6 hover:shadow-lg transition-shadow">
+            <Card className="glass-panel p-6 hover:shadow-[var(--shadow-elevated)] transition-all bg-white/80 hover:bg-white/90 border-blue-500/10">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Total Clients</p>
-                  <p className="text-2xl font-bold text-orange-500">
-                    {statsLoading ? "..." : (stats?.total_clients || 0)}
-                  </p>
+                  <p className="text-sm font-medium text-muted-foreground mb-1">Views</p>
+                  {statsLoading ? (
+                    <div className="h-9 w-16 bg-gray-200 animate-pulse rounded" />
+                  ) : (
+                    <p className="text-3xl font-bold text-blue-500">
+                      {stats?.total_clients || 0}
+                    </p>
+                  )}
                 </div>
-                <Users className="h-10 w-10 text-orange-500/20" />
-              </div>
-            </Card>
-
-            <Card className="p-6 hover:shadow-lg transition-shadow">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Growth</p>
-                  <p className="text-2xl font-bold text-green-500">
-                    {statsLoading ? "..." : `+${stats?.growth_percentage || 0}%`}
-                  </p>
+                <div className="w-12 h-12 bg-blue-500/10 rounded-2xl flex items-center justify-center shadow-sm">
+                  <TrendingUp className="h-6 w-6 text-blue-500" />
                 </div>
-                <TrendingUp className="h-10 w-10 text-green-500/20" />
               </div>
             </Card>
           </div>
 
           {/* Main Content */}
-          <Tabs defaultValue="bookings" className="space-y-8">
-            <TabsList className="grid w-full max-w-md grid-cols-2">
-              <TabsTrigger value="bookings">Bookings</TabsTrigger>
-              <TabsTrigger value="reviews">Reviews</TabsTrigger>
+          <Tabs defaultValue="bookings" className="space-y-8 animate-fade-in-up [animation-delay:400ms]">
+            <TabsList className="bg-white/80 backdrop-blur-sm p-1 rounded-xl border border-white/20 w-fit shadow-sm">
+              <TabsTrigger value="bookings" className="rounded-lg px-6 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-white transition-all font-medium">Bookings</TabsTrigger>
+              <TabsTrigger value="reviews" className="rounded-lg px-6 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-white transition-all font-medium">Reviews</TabsTrigger>
+              <TabsTrigger value="settings" className="rounded-lg px-6 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-white transition-all font-medium">Settings</TabsTrigger>
             </TabsList>
 
             <TabsContent value="bookings" className="space-y-6">
               <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold">Your Bookings</h2>
-                <Button>Update Availability</Button>
+                <h2 className="text-2xl font-bold text-foreground">Recent Bookings</h2>
               </div>
 
               {bookingsLoading ? (
-                <div className="flex items-center justify-center py-20">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <div className="flex flex-col items-center justify-center py-20 bg-white/50 rounded-2xl backdrop-blur-sm">
+                  <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
+                  <p className="text-muted-foreground animate-pulse">Loading bookings...</p>
                 </div>
               ) : bookings.length === 0 ? (
-                <Card className="p-12 text-center">
-                  <p className="text-muted-foreground">No bookings yet. Your bookings will appear here once customers book your services.</p>
+                <Card className="glass-panel p-12 text-center border-dashed border-2 border-primary/20 bg-primary/5">
+                  <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+                    <Package className="h-8 w-8 text-primary/50" />
+                  </div>
+                  <h3 className="text-lg font-bold mb-2">No bookings yet</h3>
+                  <p className="text-muted-foreground mb-6 max-w-sm mx-auto">When customers book your services, they will appear here.</p>
                 </Card>
               ) : (
                 <div className="space-y-4">
                   {bookings.map((booking: any) => (
-                    <Card key={booking.id} className="p-6 hover:shadow-lg transition-shadow">
+                    <Card key={booking.id} className="glass-panel p-6 hover:shadow-lg transition-shadow bg-white/80 hover:bg-white/95">
                       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                        <div className="space-y-3 flex-1">
+                        <div className="space-y-3">
                           <div className="flex items-center gap-3 flex-wrap">
-                            <h3 className="text-lg font-bold">{booking.customer_name || booking.customer_email || `Customer #${booking.customer_id}`}</h3>
+                            <h3 className="text-lg font-bold text-foreground">Event ID: #{booking.event_id}</h3>
                             <Badge
-                              variant={
-                                booking.status === "confirmed" ? "default" :
-                                  booking.status === "pending" ? "secondary" :
-                                    "outline"
-                              }
+                              className={`${booking.status === "confirmed" ? "bg-green-500/10 text-green-700 hover:bg-green-500/20" :
+                                booking.status === "pending" ? "bg-orange-500/10 text-orange-700 hover:bg-orange-500/20" :
+                                  "bg-destructive/10 text-destructive hover:bg-destructive/20"
+                                }`}
                             >
                               {booking.status === "confirmed" && <CheckCircle2 className="h-3 w-3 mr-1" />}
                               {booking.status === "pending" && <Clock className="h-3 w-3 mr-1" />}
@@ -274,56 +296,61 @@ const VendorDashboard = () => {
                             </Badge>
                           </div>
 
-                          <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                          <div className="flex flex-wrap gap-6 text-sm text-muted-foreground">
                             <div className="flex items-center gap-2">
-                              <Calendar className="h-4 w-4" />
+                              <Calendar className="h-4 w-4 text-primary" />
                               {formatDate(booking.event_date)}
                               {booking.event_time && ` at ${formatTime(booking.event_time)}`}
                             </div>
-                            {booking.event_id && (
-                              <div>
-                                Event ID: {booking.event_id}
-                              </div>
-                            )}
-                            {booking.notes && (
-                              <div className="text-xs">
-                                Notes: {booking.notes}
-                              </div>
-                            )}
+                            <div className="flex items-center gap-2">
+                              <Users className="h-4 w-4 text-primary" />
+                              Customer ID: {booking.customer_id}
+                            </div>
                           </div>
                         </div>
 
                         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                           <div className="text-right">
-                            <p className="text-sm text-muted-foreground">Payment</p>
-                            <p className="text-xl font-bold text-primary">
-                              ₦{Number(booking.price).toLocaleString()}
-                            </p>
+                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Amount</p>
+                            <p className="text-xl font-bold text-primary">₦{Number(booking.price).toLocaleString()}</p>
                           </div>
+
                           <div className="flex gap-2">
                             {booking.status === "pending" && (
                               <>
                                 <Button
-                                  size="sm"
                                   variant="outline"
+                                  size="sm"
                                   onClick={() => handleDecline(booking.id)}
                                   disabled={updateBookingStatus.isPending}
+                                  className="text-destructive border-destructive/20 hover:bg-destructive/10"
                                 >
-                                  <XCircle className="h-4 w-4 mr-1" />
                                   Decline
                                 </Button>
                                 <Button
                                   size="sm"
                                   onClick={() => handleAccept(booking.id)}
                                   disabled={updateBookingStatus.isPending}
+                                  className="bg-green-600 hover:bg-green-700 text-white"
                                 >
                                   <CheckCircle2 className="h-4 w-4 mr-1" />
                                   Accept
                                 </Button>
                               </>
                             )}
-                            {booking.status !== "pending" && (
-                              <Button size="sm" variant="outline">View Details</Button>
+                            {booking.status === "confirmed" && (
+                              <Button
+                                size="sm"
+                                onClick={() => updateBookingStatus.mutate({ bookingId: booking.id, status: "completed" })}
+                                disabled={updateBookingStatus.isPending}
+                                className="bg-blue-600 hover:bg-blue-700 text-white"
+                              >
+                                <CheckCircle2 className="h-4 w-4 mr-1" />
+                                Mark Completed
+                              </Button>
+                            )}
+                            {booking.status !== "pending" && booking.status !== "confirmed" && (
+                              <Button size="sm" variant="outline" className="border-primary/20 hover:bg-primary/5">View Details</Button>
                             )}
                           </div>
                         </div>
@@ -336,8 +363,8 @@ const VendorDashboard = () => {
 
             <TabsContent value="reviews" className="space-y-6">
               <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold">Customer Reviews</h2>
-                <div className="flex items-center gap-2">
+                <h2 className="text-2xl font-bold text-foreground">Customer Reviews</h2>
+                <div className="flex items-center gap-2 bg-white/50 px-4 py-2 rounded-xl backdrop-blur-sm border border-white/20">
                   <Star className="h-6 w-6 fill-yellow-400 text-yellow-400" />
                   <span className="text-2xl font-bold">{averageRating > 0 ? averageRating.toFixed(1) : "N/A"}</span>
                   <span className="text-muted-foreground">({totalReviews} review{totalReviews !== 1 ? 's' : ''})</span>
@@ -345,20 +372,25 @@ const VendorDashboard = () => {
               </div>
 
               {reviewsLoading ? (
-                <div className="flex items-center justify-center py-20">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <div className="flex flex-col items-center justify-center py-20 bg-white/50 rounded-2xl backdrop-blur-sm">
+                  <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
+                  <p className="text-muted-foreground animate-pulse">Loading reviews...</p>
                 </div>
               ) : reviews.length === 0 ? (
-                <Card className="p-12 text-center">
-                  <p className="text-muted-foreground">No reviews yet. Reviews will appear here once customers rate your services.</p>
+                <Card className="glass-panel p-12 text-center border-dashed border-2 border-primary/20 bg-primary/5">
+                  <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+                    <Star className="h-8 w-8 text-primary/50" />
+                  </div>
+                  <h3 className="text-lg font-bold mb-2">No reviews yet</h3>
+                  <p className="text-muted-foreground">Reviews will appear here once customers rate your services.</p>
                 </Card>
               ) : (
                 <div className="space-y-4">
                   {reviews.map((review: any) => (
-                    <Card key={review.id} className="p-6">
+                    <Card key={review.id} className="glass-panel p-6 bg-white/80 hover:bg-white/95 transition-colors">
                       <div className="flex items-start justify-between mb-3">
                         <div>
-                          <h3 className="font-bold mb-1">Customer #{review.customer_id}</h3>
+                          <h3 className="font-bold mb-1 text-foreground">Customer #{review.customer_id}</h3>
                           <div className="flex items-center gap-1">
                             {[...Array(5)].map((_, i) => (
                               <Star
@@ -383,16 +415,80 @@ const VendorDashboard = () => {
                 </div>
               )}
             </TabsContent>
+
+            <TabsContent value="settings" className="space-y-6">
+              <Card className="glass-panel p-6 bg-white/80">
+                <h2 className="text-2xl font-bold mb-6 text-foreground">Payout Settings</h2>
+                <p className="text-muted-foreground mb-6">Enter your bank details to receive payouts automatically when you complete bookings.</p>
+
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    const formData = new FormData(e.currentTarget);
+                    const account_number = formData.get("account_number") as string;
+                    const bank_code = formData.get("bank_code") as string;
+
+                    if (!account_number || !bank_code) {
+                      toast.error("Please fill in all bank details");
+                      return;
+                    }
+
+                    try {
+                      await api.vendors.updateMyVendor({
+                        account_number,
+                        bank_code
+                      });
+                      toast.success("Bank details saved successfully!");
+                      queryClient.invalidateQueries({ queryKey: ["vendor-profile"] });
+                    } catch (error: any) {
+                      toast.error(error.response?.data?.detail || "Failed to save bank details");
+                    }
+                  }}
+                  className="space-y-4 max-w-md"
+                >
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Bank Name</label>
+                    <select
+                      name="bank_code"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      defaultValue={vendorProfile?.bank_code || ""}
+                    >
+                      <option value="">Select Bank</option>
+                      <option value="044">Access Bank</option>
+                      <option value="058">Guaranty Trust Bank</option>
+                      <option value="033">United Bank for Africa</option>
+                      <option value="057">Zenith Bank</option>
+                      <option value="011">First Bank of Nigeria</option>
+                      {/* Short list for demo, ideally fetched from Paystack API */}
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Account Number</label>
+                    <input
+                      type="text"
+                      name="account_number"
+                      placeholder="0123456789"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      defaultValue={vendorProfile?.account_number || ""}
+                      maxLength={10}
+                    />
+                  </div>
+
+                  <Button type="submit" className="w-full">Save Bank Details</Button>
+                </form>
+              </Card>
+            </TabsContent>
           </Tabs>
 
           {/* Performance Chart Placeholder */}
-          <section className="mt-16">
-            <Card className="p-6">
-              <h2 className="text-2xl font-bold mb-6">Performance Overview</h2>
-              <div className="h-64 bg-gradient-to-br from-primary/5 to-accent/5 rounded-lg flex items-center justify-center">
+          <section className="mt-16 sm:pb-8">
+            <Card className="glass-panel p-6 bg-white/80">
+              <h2 className="text-2xl font-bold mb-6 text-foreground">Performance Overview</h2>
+              <div className="h-64 bg-gradient-to-br from-primary/5 to-accent/5 rounded-lg flex items-center justify-center border border-primary/10 border-dashed">
                 <div className="text-center">
-                  <TrendingUp className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-                  <p className="text-muted-foreground">Performance chart coming soon</p>
+                  <TrendingUp className="h-16 w-16 mx-auto mb-4 text-primary/30" />
+                  <p className="text-muted-foreground font-medium">Performance analytics coming soon</p>
                 </div>
               </div>
             </Card>
@@ -400,7 +496,7 @@ const VendorDashboard = () => {
         </div>
       </section>
 
-      <Footer />
+
     </div>
   );
 };

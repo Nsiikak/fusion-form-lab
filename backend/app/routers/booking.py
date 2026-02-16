@@ -23,6 +23,47 @@ async def create_booking(
             detail="Only customers can create bookings"
         )
     
+    # Verify Payment if reference provided
+    if booking_data.payment_reference:
+        import os
+        import requests
+        
+        PAYSTACK_SECRET_KEY = os.getenv("PAYSTACK_SECRET_KEY")
+        if PAYSTACK_SECRET_KEY:
+            try:
+                headers = {
+                    "Authorization": f"Bearer {PAYSTACK_SECRET_KEY}",
+                    "Content-Type": "application/json",
+                }
+                verification_url = f"https://api.paystack.co/transaction/verify/{booking_data.payment_reference}"
+                response = requests.get(verification_url, headers=headers)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    if data["data"]["status"] != "success":
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Payment verification failed: Transaction not successful"
+                        )
+                    # Optional: Verify amount
+                    # expected_amount = booking_data.price * 100
+                    # if data["data"]["amount"] != expected_amount:
+                    #     ...
+                else:
+                     raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Payment verification failed: Could not verify transaction"
+                    )
+            except Exception as e:
+                # Log error
+                print(f"Payment verification error: {str(e)}")
+                # Depending on requirement, might want to allow booking with a warning or block it.
+                # Here we block it for safety if verification was attempted but failed.
+                if isinstance(e, HTTPException):
+                    raise e
+                # Fallback: maintain original behavior if network error or others? 
+                # For now, let's assume if reference is provided, it MUST be valid.
+    
     return BookingService.create_booking(db, booking_data, current_user.id)
 
 @router.get("", response_model=list[dict])

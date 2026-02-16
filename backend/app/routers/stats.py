@@ -8,7 +8,7 @@ from app.entities.booking.model import Booking, BookingStatus
 from app.entities.event.model import Event, EventStatus
 from app.entities.review.model import Review
 from app.entities.vendor.service import VendorService
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 router = APIRouter()
 
@@ -86,8 +86,9 @@ async def get_vendor_stats(
     total_reviews = rating_result.total_reviews or 0
     
     # Calculate growth (bookings in last 30 days vs previous 30 days)
-    thirty_days_ago = datetime.now() - timedelta(days=30)
-    sixty_days_ago = datetime.now() - timedelta(days=60)
+    now = datetime.now(timezone.utc)
+    thirty_days_ago = now - timedelta(days=30)
+    sixty_days_ago = now - timedelta(days=60)
     
     recent_bookings = [b for b in all_bookings if b.created_at >= thirty_days_ago]
     previous_bookings = [b for b in all_bookings if sixty_days_ago <= b.created_at < thirty_days_ago]

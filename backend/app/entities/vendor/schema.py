@@ -28,12 +28,20 @@ class VendorUpdate(BaseModel):
     starting_price: Optional[Decimal] = None
     business_size: Optional[BusinessSize] = None
     registration_number: Optional[str] = None
-
+    # Bank details for update
+    bank_code: Optional[str] = None
+    account_number: Optional[str] = None
+    
 class VendorResponse(VendorBase):
     id: int
     user_id: int
     verification_status: VerificationStatus
     is_active: bool
+    # Bank details
+    bank_code: Optional[str] = None
+    account_number: Optional[str] = None
+    # We do not expose recipient_code
+    
     created_at: datetime
     updated_at: Optional[datetime] = None
 

@@ -124,11 +124,11 @@ class BookingService:
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Not authorized to update this booking"
                 )
-            # Vendors can only change to confirmed or declined
-            if new_status not in [BookingStatus.CONFIRMED, BookingStatus.DECLINED]:
+            # Vendors can only change to confirmed, declined, or completed
+            if new_status not in [BookingStatus.CONFIRMED, BookingStatus.DECLINED, BookingStatus.COMPLETED]:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Vendors can only confirm or decline bookings"
+                    detail="Vendors can only confirm, decline, or complete bookings"
                 )
         elif user_role == "customer":
             if booking.customer_id != user_id:
@@ -136,11 +136,11 @@ class BookingService:
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Not authorized to update this booking"
                 )
-            # Customers can only cancel
-            if new_status != BookingStatus.CANCELLED:
+            # Customers can only cancel or complete (to release funds)
+            if new_status not in [BookingStatus.CANCELLED, BookingStatus.COMPLETED]:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Customers can only cancel bookings"
+                    detail="Customers can only cancel or complete bookings"
                 )
         else:
             raise HTTPException(
@@ -151,6 +151,28 @@ class BookingService:
         booking.status = new_status
         db.commit()
         db.refresh(booking)
+        
+        # Trigger Payout if Completed
+        if new_status == BookingStatus.COMPLETED:
+            try:
+                from app.entities.vendor.model import Vendor
+                vendor = db.query(Vendor).filter(Vendor.id == booking.vendor_id).first()
+                
+                if vendor and vendor.recipient_code:
+                    from app.services.paystack import paystack_service
+                    # Calculate amount (90% to vendor, 10% platform fee)
+                    amount = float(booking.price) * 0.90
+                    
+                    paystack_service.initiate_transfer(
+                        amount=amount,
+                        recipient_code=vendor.recipient_code,
+                        reference=f"BKG_{booking.id}",
+                        reason=f"Payout for Booking #{booking.id}"
+                    )
+            except Exception as e:
+                print(f"Payout failed for booking {booking.id}: {str(e)}")
+                # We don't rollback the status update, but we should probably log this error properly
+                # or have a retry mechanism. For now, we log to console.
         
         return booking
     

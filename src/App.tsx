@@ -13,6 +13,7 @@ import VendorSearch from "./pages/VendorSearch";
 import VendorRegistration from "./pages/VendorRegistration";
 import CustomerDashboard from "./pages/CustomerDashboard";
 import VendorDashboard from "./pages/VendorDashboard";
+import VendorDetails from "./pages/VendorDetails"; // 1. Import VendorDetails
 
 const queryClient = new QueryClient();
 
@@ -29,6 +30,7 @@ const App = () => (
             <Route path="/register" element={<Register />} />
             <Route path="/vendor-search" element={<VendorSearch />} />
             <Route path="/vendor-registration" element={<VendorRegistration />} />
+            <Route path="/vendors/:id" element={<VendorDetails />} /> {/* 2. Add Route path="/vendors/:id" element={<VendorDetails />} */}
             <Route
               path="/customer-dashboard"
               element={
