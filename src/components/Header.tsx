@@ -8,9 +8,9 @@ export const Header = () => {
 
     const navItems = [
         { name: "Home", path: "/" },
-        { name: "Services", path: "/services" },
-        { name: "About", path: "/about" },
-        { name: "Contact", path: "/contact" },
+        { name: "Services", path: "/" },
+        { name: "About", path: "/" },
+        { name: "Contact", path: "/" },
     ];
 
     return (
@@ -49,7 +49,7 @@ export const Header = () => {
                                 Login
                             </Button>
                         </Link>
-                        <Link to="/signup">
+                        <Link to="/register">
                             <Button className="bg-white text-primary hover:bg-white/90 shadow-lg hover:shadow-white/50 transition-all duration-300 hover:scale-105">
                                 Sign Up
                             </Button>

@@ -1,0 +1,11 @@
+Production Polish Plan:
+1.  **Footer Removal**: Remove `<Footer />` from:
+    -   `Login.tsx`
+    -   `Register.tsx`
+    -   `VendorRegistration.tsx`
+    -   `VendorSearch.tsx`
+    -   `VendorDetails.tsx`
+    -   (Already removed from Dashboards)
+    -   *Keep* in `Index.tsx`.
+
+2.  **Validation**: Verify `Index.tsx` still has it.

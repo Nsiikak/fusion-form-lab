@@ -79,10 +79,27 @@ class VendorService:
             )
         
         # Update fields
-        for field, value in vendor_data.items():
-            if value is not None:
-                setattr(vendor, field, value)
-        
+        for key, value in vendor_data.dict(exclude_unset=True).items():
+            setattr(vendor, key, value)
+            
+        # usage of paystack service to create recipient if bank details change
+        if vendor_data.account_number and vendor_data.bank_code:
+            try:
+                from app.services.paystack import paystack_service
+                # Get bank name for recipient creation (optional, but good for data)
+                # For now just use business name
+                recipient_code = paystack_service.create_transfer_recipient(
+                    name=vendor.business_name,
+                    account_number=vendor_data.account_number,
+                    bank_code=vendor_data.bank_code
+                )
+                vendor.recipient_code = recipient_code
+            except Exception as e:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Failed to verify bank account: {str(e)}"
+                )
+
         db.commit()
         db.refresh(vendor)
         return vendor

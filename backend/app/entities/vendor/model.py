@@ -37,6 +37,12 @@ class Vendor(Base):
     registration_number = Column(String, nullable=True)
     verification_status = Column(Enum(VerificationStatus), default=VerificationStatus.PENDING, nullable=False)
     is_active = Column(Boolean, default=True)
+    
+    # Banking Details
+    bank_code = Column(String, nullable=True)
+    account_number = Column(String, nullable=True)
+    recipient_code = Column(String, nullable=True)
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

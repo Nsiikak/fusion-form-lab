@@ -151,6 +151,7 @@ export const api = {
       event_date: string;
       event_time?: string;
       notes?: string;
+      payment_reference?: string;
     }) => {
       const response = await apiClient.post("/api/bookings", data);
       return response.data;
