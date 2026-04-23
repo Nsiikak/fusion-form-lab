@@ -16,9 +16,12 @@ import {
   LogOut,
   Loader2,
   Settings,
-  Package
+  Package,
+  ShieldCheck,
+  AlertTriangle,
+  RefreshCw,
 } from "lucide-react";
-import logo from "@/assets/plagohive-icon.svg";
+import logo from "@/assets/plagohive-logo.svg";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api";
@@ -117,6 +120,24 @@ const VendorDashboard = () => {
     }
   };
 
+  // Re-verify CAC mutation
+  const reVerifyMutation = useMutation({
+    mutationFn: () => api.vendors.reVerify(),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["vendor-profile"] });
+      if (data.cac?.verified) {
+        toast.success(`Business verified! Matched CAC record: "${data.cac.cac_verified_name}"`);
+      } else if (data.cac?.found) {
+        toast.warning(`RC number found but name mismatch. CAC record: "${data.cac.cac_verified_name}". Our team will review manually.`);
+      } else {
+        toast.error("RC number not found in CAC database. Please check and update your profile.");
+      }
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.detail || "Verification failed. Please try again later.");
+    },
+  });
+
   const handleAccept = (bookingId: number) => {
     updateBookingStatus.mutate({ bookingId, status: "confirmed" });
   };
@@ -132,11 +153,11 @@ const VendorDashboard = () => {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-3">
           <div className="flex items-center justify-between">
             <Link to="/">
-              <img src={logo} alt="Plagohive" className="h-10" />
+              <img src={logo} alt="Plagohive" className="h-12" />
             </Link>
             <nav className="hidden md:flex items-center gap-6">
               <Link to="/vendor-dashboard" className="text-sm font-medium text-primary bg-primary/10 px-3 py-1.5 rounded-full">Dashboard</Link>
-              <Link to="/profile" className="text-sm font-medium hover:text-primary transition-colors">Profile</Link>
+              <Link to="/profile" className="text-sm font-medium hover:text-primary transition-colors text-foreground/70">Profile</Link>
               {user && (
                 <span className="text-sm text-muted-foreground flex items-center gap-2">
                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-secondary to-accent text-white flex items-center justify-center font-bold shadow-sm">
@@ -164,19 +185,74 @@ const VendorDashboard = () => {
                   Vendor Dashboard
                 </h1>
                 <p className="text-muted-foreground text-lg">
-                  Welcome back, <span className="font-semibold text-foreground">{user?.business_name || "Partner"}</span>
+                  Welcome back, <span className="font-semibold text-foreground">{user?.full_name || "Vendor"}</span>
                 </p>
               </div>
-              <Button className="shadow-lg hover:shadow-primary/30 bg-primary hover:bg-primary/90 text-white">
-                <Settings className="mr-2 h-4 w-4" />
-                Manage Profile
-              </Button>
+              <Link to="/profile">
+                <Button className="shadow-lg hover:shadow-primary/30 bg-primary hover:bg-primary/90 text-white">
+                  <Settings className="mr-2 h-4 w-4" />
+                  Manage Profile
+                </Button>
+              </Link>
             </div>
           </div>
 
+          {/* CAC Verification Banner */}
+          {vendorProfile && vendorProfile.verification_status !== "approved" && (
+            <div className={`mb-8 rounded-2xl border px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+              vendorProfile.cac_verification_attempted
+                ? "bg-orange-500/5 border-orange-500/20"
+                : "bg-primary/5 border-primary/20"
+            }`}>
+              <div className="flex items-start gap-3">
+                {vendorProfile.cac_verification_attempted ? (
+                  <AlertTriangle className="h-5 w-5 text-orange-500 flex-shrink-0 mt-0.5" />
+                ) : (
+                  <ShieldCheck className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+                )}
+                <div>
+                  <p className="text-sm font-semibold text-foreground">
+                    {vendorProfile.cac_verification_attempted
+                      ? "Verification pending manual review"
+                      : "Your account is pending verification"}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {vendorProfile.cac_verification_attempted
+                      ? vendorProfile.cac_verified_name
+                        ? `CAC record found: "${vendorProfile.cac_verified_name}". Name mismatch — our team is reviewing.`
+                        : "RC number not matched in CAC. Update your profile with the correct RC number and retry."
+                      : "Add your CAC RC number in your profile and run verification to get approved instantly."}
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2 flex-shrink-0">
+                {vendorProfile.registration_number && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="text-xs h-8 border-primary/30 hover:bg-primary/5"
+                    disabled={reVerifyMutation.isPending}
+                    onClick={() => reVerifyMutation.mutate()}
+                  >
+                    {reVerifyMutation.isPending ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <><RefreshCw className="h-3.5 w-3.5 mr-1.5" />Re-verify</>
+                    )}
+                  </Button>
+                )}
+                <Link to="/profile">
+                  <Button size="sm" className="text-xs h-8">
+                    {vendorProfile.registration_number ? "Update Profile" : "Add RC Number"}
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          )}
+
           {/* Quick Stats */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12 animate-fade-in-up [animation-delay:200ms]">
-            <Card className="glass-panel p-6 hover:shadow-[var(--shadow-elevated)] transition-all bg-white/80 hover:bg-white/90 border-primary/10">
+            <Card className="bg-white border border-border p-6 hover:shadow-[var(--shadow-elevated)] transition-all">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground mb-1">Total Earnings</p>
@@ -194,7 +270,7 @@ const VendorDashboard = () => {
               </div>
             </Card>
 
-            <Card className="glass-panel p-6 hover:shadow-[var(--shadow-elevated)] transition-all bg-white/80 hover:bg-white/90 border-accent/10">
+            <Card className="bg-white border border-border p-6 hover:shadow-[var(--shadow-elevated)] transition-all">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground mb-1">Bookings</p>
@@ -212,7 +288,7 @@ const VendorDashboard = () => {
               </div>
             </Card>
 
-            <Card className="glass-panel p-6 hover:shadow-[var(--shadow-elevated)] transition-all bg-white/80 hover:bg-white/90 border-secondary/10">
+            <Card className="bg-white border border-border p-6 hover:shadow-[var(--shadow-elevated)] transition-all">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground mb-1">Rating</p>
@@ -220,7 +296,7 @@ const VendorDashboard = () => {
                     <div className="h-9 w-16 bg-gray-200 animate-pulse rounded" />
                   ) : (
                     <p className="text-3xl font-bold text-secondary">
-                      {stats?.average_rating > 0 ? stats.average_rating.toFixed(1) : "N/A"}
+                      {(stats?.average_rating ?? 0) > 0 ? Number(stats!.average_rating).toFixed(1) : "N/A"}
                     </p>
                   )}
                 </div>
@@ -230,7 +306,7 @@ const VendorDashboard = () => {
               </div>
             </Card>
 
-            <Card className="glass-panel p-6 hover:shadow-[var(--shadow-elevated)] transition-all bg-white/80 hover:bg-white/90 border-blue-500/10">
+            <Card className="bg-white border border-border p-6 hover:shadow-[var(--shadow-elevated)] transition-all">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground mb-1">Views</p>
@@ -268,7 +344,7 @@ const VendorDashboard = () => {
                   <p className="text-muted-foreground animate-pulse">Loading bookings...</p>
                 </div>
               ) : bookings.length === 0 ? (
-                <Card className="glass-panel p-12 text-center border-dashed border-2 border-primary/20 bg-primary/5">
+                <Card className="bg-white border-2 border-dashed border-primary/20 p-12 text-center">
                   <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
                     <Package className="h-8 w-8 text-primary/50" />
                   </div>
@@ -278,7 +354,7 @@ const VendorDashboard = () => {
               ) : (
                 <div className="space-y-4">
                   {bookings.map((booking: any) => (
-                    <Card key={booking.id} className="glass-panel p-6 hover:shadow-lg transition-shadow bg-white/80 hover:bg-white/95">
+                    <Card key={booking.id} className="bg-white border border-border p-6 hover:shadow-lg transition-shadow">
                       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                         <div className="space-y-3">
                           <div className="flex items-center gap-3 flex-wrap">
@@ -377,7 +453,7 @@ const VendorDashboard = () => {
                   <p className="text-muted-foreground animate-pulse">Loading reviews...</p>
                 </div>
               ) : reviews.length === 0 ? (
-                <Card className="glass-panel p-12 text-center border-dashed border-2 border-primary/20 bg-primary/5">
+                <Card className="bg-white border-2 border-dashed border-primary/20 p-12 text-center">
                   <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
                     <Star className="h-8 w-8 text-primary/50" />
                   </div>
@@ -417,7 +493,7 @@ const VendorDashboard = () => {
             </TabsContent>
 
             <TabsContent value="settings" className="space-y-6">
-              <Card className="glass-panel p-6 bg-white/80">
+              <Card className="bg-white border border-border p-6">
                 <h2 className="text-2xl font-bold mb-6 text-foreground">Payout Settings</h2>
                 <p className="text-muted-foreground mb-6">Enter your bank details to receive payouts automatically when you complete bookings.</p>
 
@@ -483,7 +559,7 @@ const VendorDashboard = () => {
 
           {/* Performance Chart Placeholder */}
           <section className="mt-16 sm:pb-8">
-            <Card className="glass-panel p-6 bg-white/80">
+            <Card className="bg-white border border-border p-6">
               <h2 className="text-2xl font-bold mb-6 text-foreground">Performance Overview</h2>
               <div className="h-64 bg-gradient-to-br from-primary/5 to-accent/5 rounded-lg flex items-center justify-center border border-primary/10 border-dashed">
                 <div className="text-center">

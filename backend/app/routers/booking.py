@@ -1,3 +1,6 @@
+import os
+import logging
+import requests
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import Optional
@@ -7,6 +10,9 @@ from app.entities.user.model import User
 from app.entities.booking import schema
 from app.entities.booking.model import BookingStatus
 from app.entities.booking.service import BookingService
+from app.entities.vendor.service import VendorService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -25,19 +31,16 @@ async def create_booking(
     
     # Verify Payment if reference provided
     if booking_data.payment_reference:
-        import os
-        import requests
-        
         PAYSTACK_SECRET_KEY = os.getenv("PAYSTACK_SECRET_KEY")
         if PAYSTACK_SECRET_KEY:
             try:
-                headers = {
+                verify_headers = {
                     "Authorization": f"Bearer {PAYSTACK_SECRET_KEY}",
                     "Content-Type": "application/json",
                 }
                 verification_url = f"https://api.paystack.co/transaction/verify/{booking_data.payment_reference}"
-                response = requests.get(verification_url, headers=headers)
-                
+                response = requests.get(verification_url, headers=verify_headers, timeout=10)
+
                 if response.status_code == 200:
                     data = response.json()
                     if data["data"]["status"] != "success":
@@ -45,24 +48,19 @@ async def create_booking(
                             status_code=status.HTTP_400_BAD_REQUEST,
                             detail="Payment verification failed: Transaction not successful"
                         )
-                    # Optional: Verify amount
-                    # expected_amount = booking_data.price * 100
-                    # if data["data"]["amount"] != expected_amount:
-                    #     ...
                 else:
-                     raise HTTPException(
+                    raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail="Payment verification failed: Could not verify transaction"
                     )
+            except HTTPException:
+                raise
             except Exception as e:
-                # Log error
-                print(f"Payment verification error: {str(e)}")
-                # Depending on requirement, might want to allow booking with a warning or block it.
-                # Here we block it for safety if verification was attempted but failed.
-                if isinstance(e, HTTPException):
-                    raise e
-                # Fallback: maintain original behavior if network error or others? 
-                # For now, let's assume if reference is provided, it MUST be valid.
+                logger.error("Payment verification error for reference %s: %s", booking_data.payment_reference, str(e))
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail="Payment verification service unavailable. Please try again."
+                )
     
     return BookingService.create_booking(db, booking_data, current_user.id)
 
@@ -95,7 +93,6 @@ async def get_booking(
         )
     
     # Check authorization
-    from app.entities.vendor.service import VendorService
     vendor = VendorService.get_vendor_by_user_id(db, current_user.id)
     
     if booking.customer_id != current_user.id and (not vendor or booking.vendor_id != vendor.id):
@@ -122,7 +119,6 @@ async def update_booking_status(
         current_user.role.value
     )
     # Return enriched booking data
-    from app.entities.vendor.service import VendorService
     vendor = VendorService.get_vendor_by_id(db, booking.vendor_id)
     customer = db.query(User).filter(User.id == booking.customer_id).first()
     

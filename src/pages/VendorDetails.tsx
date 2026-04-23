@@ -80,7 +80,7 @@ const VendorDetails = () => {
                 <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
                     <div className="flex items-center justify-between">
                         <Link to="/">
-                            <img src={logo} alt="Plagohive" className="h-10" />
+                            <img src={logo} alt="Plagohive" className="h-12" />
                         </Link>
                         <div className="flex items-center gap-4">
                             <Link to="/vendor-search">
@@ -124,7 +124,7 @@ const VendorDetails = () => {
                             </div>
 
                             <div className="flex gap-3">
-                                <Button variant="outline" className="glass-panel">
+                                <Button variant="outline">
                                     <Share2 className="h-4 w-4 mr-2" /> Share
                                 </Button>
                                 <Button size="lg" className="shadow-lg hover:shadow-primary/30" onClick={handleBookClick}>
@@ -141,7 +141,7 @@ const VendorDetails = () => {
                         <div className="lg:col-span-2 space-y-8">
                             <section className="animate-fade-in-up">
                                 <h2 className="text-2xl font-bold mb-4">About</h2>
-                                <Card className="p-6 glass-panel">
+                                <Card className="p-6 bg-white border border-border shadow-sm">
                                     <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
                                         {vendor.description || "No description provided."}
                                     </p>
@@ -150,7 +150,7 @@ const VendorDetails = () => {
 
                             <section className="animate-fade-in-up [animation-delay:200ms]">
                                 <h2 className="text-2xl font-bold mb-4">Services & Pricing</h2>
-                                <Card className="p-6 glass-panel">
+                                <Card className="p-6 bg-white border border-border shadow-sm">
                                     <div className="flex items-center justify-between mb-4">
                                         <div>
                                             <h3 className="font-semibold text-lg">Standard Service Package</h3>
@@ -175,12 +175,12 @@ const VendorDetails = () => {
                                 <h2 className="text-2xl font-bold mb-4">Reviews</h2>
                                 <div className="space-y-4">
                                     {reviews.length === 0 ? (
-                                        <Card className="p-8 text-center glass-panel border-dashed">
+                                        <Card className="p-8 text-center bg-white border border-dashed border-border">
                                             <p className="text-muted-foreground">No reviews yet.</p>
                                         </Card>
                                     ) : (
                                         reviews.map((review: any) => (
-                                            <Card key={review.id} className="p-6 glass-panel">
+                                            <Card key={review.id} className="p-6 bg-white border border-border shadow-sm">
                                                 <div className="flex items-start justify-between mb-2">
                                                     <div className="flex items-center gap-2">
                                                         <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
@@ -207,7 +207,7 @@ const VendorDetails = () => {
 
                         {/* Right Column - Sidebar */}
                         <div className="space-y-6">
-                            <Card className="p-6 glass-panel sticky top-24">
+                            <Card className="p-6 bg-white border border-border shadow-sm sticky top-24">
                                 <h3 className="font-bold text-lg mb-4">Book this Vendor</h3>
                                 <div className="space-y-4 mb-6">
                                     <div className="flex justify-between text-sm">

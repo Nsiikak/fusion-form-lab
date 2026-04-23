@@ -1,3 +1,4 @@
+import logging
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from fastapi import HTTPException, status
@@ -5,6 +6,9 @@ from app.entities.booking.model import Booking, BookingStatus
 from app.entities.booking.schema import BookingCreate
 from app.entities.vendor.model import Vendor
 from app.entities.user.model import User
+from app.services.paystack import paystack_service
+
+logger = logging.getLogger(__name__)
 
 class BookingService:
     @staticmethod
@@ -155,14 +159,12 @@ class BookingService:
         # Trigger Payout if Completed
         if new_status == BookingStatus.COMPLETED:
             try:
-                from app.entities.vendor.model import Vendor
                 vendor = db.query(Vendor).filter(Vendor.id == booking.vendor_id).first()
                 
                 if vendor and vendor.recipient_code:
-                    from app.services.paystack import paystack_service
                     # Calculate amount (90% to vendor, 10% platform fee)
                     amount = float(booking.price) * 0.90
-                    
+
                     paystack_service.initiate_transfer(
                         amount=amount,
                         recipient_code=vendor.recipient_code,
@@ -170,7 +172,7 @@ class BookingService:
                         reason=f"Payout for Booking #{booking.id}"
                     )
             except Exception as e:
-                print(f"Payout failed for booking {booking.id}: {str(e)}")
+                logger.error("Payout failed for booking %s: %s", booking.id, str(e))
                 # We don't rollback the status update, but we should probably log this error properly
                 # or have a retry mechanism. For now, we log to console.
         

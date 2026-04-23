@@ -5,7 +5,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
 import {
   Form,
   FormControl,
@@ -16,8 +15,8 @@ import {
 } from "@/components/ui/form";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { ArrowRight, Mail, Lock, Loader2, CheckCircle2 } from "lucide-react";
 import logo from "@/assets/plagohive-logo.svg";
-import { ArrowRight, Mail, Lock, Loader2 } from "lucide-react";
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -33,10 +32,7 @@ const Login = () => {
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
-    defaultValues: {
-      email: "",
-      password: "",
-    },
+    defaultValues: { email: "", password: "" },
   });
 
   const onSubmit = async (data: LoginFormValues) => {
@@ -53,47 +49,85 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center relative overflow-hidden bg-gradient-to-br from-primary via-primary-glow to-accent bg-[length:200%_200%] animate-gradient-shift">
-      {/* Animated Elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 left-10 w-72 h-72 bg-secondary/20 rounded-full blur-3xl animate-float" />
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-accent/20 rounded-full blur-3xl animate-float-slow" />
-      </div>
+    <div className="min-h-screen flex">
+      {/* Left — Brand panel */}
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-primary via-primary-glow to-accent flex-col justify-between p-12 relative overflow-hidden">
+        {/* Subtle depth */}
+        <div className="absolute inset-0 bg-black/10 pointer-events-none" />
+        <div className="absolute -top-32 -right-32 w-80 h-80 bg-secondary/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-accent/20 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="w-full max-w-md p-4 relative z-10 animate-fade-in-up">
-        <div className="mb-8 text-center space-y-2">
-          <Link to="/" className="inline-block transition-transform hover:scale-105">
-            <img src={logo} alt="Plagohive" className="h-16 mx-auto mb-6 drop-shadow-2xl" />
+        {/* Logo */}
+        <div className="relative z-10">
+          <Link to="/">
+            <img src={logo} alt="Plagohive" className="h-14" />
           </Link>
-          <h1 className="text-4xl font-bold tracking-tight text-white drop-shadow-md">
-            Welcome back
-          </h1>
-          <p className="text-white/90 text-lg font-medium">
-            Enter your credentials to access your workspace
-          </p>
         </div>
 
-        <Card className="p-8 shadow-2xl backdrop-blur-xl bg-white/10 border-white/20">
+        {/* Middle content */}
+        <div className="relative z-10 space-y-8">
+          <div>
+            <h2 className="text-3xl font-bold text-white mb-3 leading-tight">
+              Africa's Premier<br />Event Marketplace
+            </h2>
+            <p className="text-white/75 text-base leading-relaxed max-w-sm">
+              Connect with thousands of verified vendors and plan unforgettable events with confidence.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            {[
+              "1,000+ verified vendors across Africa",
+              "Secure payments and booking protection",
+              "24/7 support for every event",
+            ].map((item) => (
+              <div key={item} className="flex items-center gap-3">
+                <CheckCircle2 className="h-4 w-4 text-secondary flex-shrink-0" />
+                <span className="text-white/80 text-sm">{item}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Bottom */}
+        <p className="relative z-10 text-white/40 text-xs">© 2026 Plagohive. All rights reserved.</p>
+      </div>
+
+      {/* Right — Form panel */}
+      <div className="flex-1 flex flex-col justify-center px-6 sm:px-12 lg:px-16 py-12 bg-white">
+        {/* Mobile logo */}
+        <div className="lg:hidden mb-8 text-center">
+          <Link to="/">
+            <img src={logo} alt="Plagohive" className="h-10 mx-auto" />
+          </Link>
+        </div>
+
+        <div className="w-full max-w-sm mx-auto">
+          <div className="mb-8">
+            <h1 className="text-2xl font-bold text-foreground mb-1 tracking-tight">Welcome back</h1>
+            <p className="text-muted-foreground text-sm">Enter your credentials to continue</p>
+          </div>
+
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
               <FormField
                 control={form.control}
                 name="email"
                 render={({ field }) => (
-                  <FormItem className="space-y-1.5">
-                    <FormLabel className="text-white font-medium">Email</FormLabel>
+                  <FormItem>
+                    <FormLabel className="text-sm font-medium">Email address</FormLabel>
                     <FormControl>
                       <div className="relative">
-                        <Mail className="absolute left-3 top-3.5 h-5 w-5 text-white/70" />
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
                           type="email"
                           placeholder="name@example.com"
-                          className="pl-10 h-12 bg-white/20 border-white/30 text-white placeholder:text-white/60 focus:bg-white/30 focus:border-white/50"
+                          className="pl-10 h-11"
                           {...field}
                         />
                       </div>
                     </FormControl>
-                    <FormMessage className="text-red-200" />
+                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -102,59 +136,62 @@ const Login = () => {
                 control={form.control}
                 name="password"
                 render={({ field }) => (
-                  <FormItem className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <FormLabel className="text-white font-medium">Password</FormLabel>
-                      <Link
-                        to="/forgot-password"
-                        className="text-xs text-white/90 hover:text-white hover:underline transition-colors"
-                      >
+                  <FormItem>
+                    <div className="flex items-center justify-between mb-1">
+                      <FormLabel className="text-sm font-medium">Password</FormLabel>
+                      <Link to="/forgot-password" className="text-xs text-primary hover:underline">
                         Forgot password?
                       </Link>
                     </div>
                     <FormControl>
                       <div className="relative">
-                        <Lock className="absolute left-3 top-3.5 h-5 w-5 text-white/70" />
+                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
                           type="password"
                           placeholder="••••••••"
-                          className="pl-10 h-12 bg-white/20 border-white/30 text-white placeholder:text-white/60 focus:bg-white/30 focus:border-white/50"
+                          className="pl-10 h-11"
                           {...field}
                         />
                       </div>
                     </FormControl>
-                    <FormMessage className="text-red-200" />
+                    <FormMessage />
                   </FormItem>
                 )}
               />
 
               <Button
                 type="submit"
-                className="w-full h-12 bg-secondary hover:bg-secondary/90 text-secondary-foreground font-bold text-lg shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300"
+                className="w-full h-11 bg-primary hover:bg-primary/90 text-white font-semibold"
                 disabled={isSubmitting || isLoading}
               >
                 {isSubmitting ? (
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  <>
-                    Sign in <ArrowRight className="ml-2 h-5 w-5" />
-                  </>
+                  <>Sign in <ArrowRight className="ml-2 h-4 w-4" /></>
                 )}
               </Button>
             </form>
           </Form>
 
-          <div className="mt-8 text-center text-sm">
-            <span className="text-white/80">New to Plagohive? </span>
-            <Link to="/register" className="text-white font-bold hover:underline decoration-2 underline-offset-4 decoration-secondary">
-              Create an account
+          <p className="mt-6 text-center text-sm text-muted-foreground">
+            Don't have an account?{" "}
+            <Link to="/register" className="text-primary font-semibold hover:underline">
+              Create one
+            </Link>
+          </p>
+
+          <div className="mt-8 pt-6 border-t border-border text-center">
+            <p className="text-xs text-muted-foreground mb-3">Are you a vendor?</p>
+            <Link to="/vendor-registration">
+              <Button variant="outline" size="sm" className="text-xs w-full">
+                Register your business
+              </Button>
             </Link>
           </div>
-        </Card>
+        </div>
       </div>
     </div>
   );
 };
 
 export default Login;
-

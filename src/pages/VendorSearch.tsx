@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ElementType } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
-import { Search, MapPin, Star, Filter, LogOut, Loader2 } from "lucide-react";
+import { Search, MapPin, Star, Filter, LogOut, Loader2, Utensils, Palette, Camera, Music, Truck, Building2, Store, CheckCircle2 } from "lucide-react";
 import { Footer } from "@/components/Footer";
 import logo from "@/assets/plagohive-logo.svg";
 import { Link, useNavigate } from "react-router-dom";
@@ -96,17 +96,17 @@ const VendorSearch = () => {
     return entry ? entry[0] : category;
   };
 
-  // Get emoji for category
-  const getCategoryEmoji = (category: string) => {
-    const emojiMap: Record<string, string> = {
-      catering: "🍽️",
-      decoration: "🎨",
-      photography: "📸",
-      entertainment: "🎵",
-      logistics: "🚚",
-      venue: "🏛️",
-    };
-    return emojiMap[category] || "🏢";
+  const categoryIconMap: Record<string, React.ElementType> = {
+    catering: Utensils,
+    decoration: Palette,
+    photography: Camera,
+    entertainment: Music,
+    logistics: Truck,
+    venue: Building2,
+  };
+
+  const getCategoryIcon = (category: string): React.ElementType => {
+    return categoryIconMap[category] || Store;
   };
 
   return (
@@ -116,7 +116,7 @@ const VendorSearch = () => {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <Link to="/">
-              <img src={logo} alt="Plagohive" className="h-10" />
+              <img src={logo} alt="Plagohive" className="h-12" />
             </Link>
             <nav className="hidden md:flex items-center gap-6">
               <Link to="/vendor-search" className="text-sm font-medium hover:text-primary transition-colors">Find Vendors</Link>
@@ -228,8 +228,8 @@ const VendorSearch = () => {
                     key={vendor.id}
                     className="overflow-hidden hover:shadow-elevated transition-all duration-300 hover:-translate-y-1 cursor-pointer"
                   >
-                    <div className="aspect-video bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center text-6xl">
-                      {getCategoryEmoji(vendor.category)}
+                    <div className="aspect-video bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center">
+                      {(() => { const Icon = getCategoryIcon(vendor.category); return <Icon className="h-12 w-12 text-primary/40" />; })()}
                     </div>
                     <div className="p-6">
                       <div className="flex items-start justify-between mb-2">
@@ -238,7 +238,7 @@ const VendorSearch = () => {
                           <Badge variant="secondary">{getCategoryDisplayName(vendor.category)}</Badge>
                         </div>
                         {vendor.verification_status === "approved" && (
-                          <Badge className="bg-accent">✓ Verified</Badge>
+                          <Badge className="bg-accent text-white gap-1"><CheckCircle2 className="h-3 w-3" /> Verified</Badge>
                         )}
                       </div>
 

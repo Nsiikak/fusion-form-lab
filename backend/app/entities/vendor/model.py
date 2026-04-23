@@ -42,6 +42,11 @@ class Vendor(Base):
     bank_code = Column(String, nullable=True)
     account_number = Column(String, nullable=True)
     recipient_code = Column(String, nullable=True)
+
+    # CAC Verification
+    cac_id = Column(String, nullable=True)
+    cac_verified_name = Column(String, nullable=True)
+    cac_verification_attempted = Column(Boolean, default=False)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

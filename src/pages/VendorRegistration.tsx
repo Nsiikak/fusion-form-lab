@@ -52,7 +52,7 @@ const step2Schema = z.object({
 
 // Step 3 schema
 const step3Schema = z.object({
-  registration_number: z.string().optional(),
+  registration_number: z.string().min(1, "RC number is required for automatic verification"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -157,7 +157,7 @@ const VendorRegistration = () => {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <Link to="/">
-              <img src={logo} alt="Plagohive" className="h-10" />
+              <img src={logo} alt="Plagohive" className="h-12" />
             </Link>
             <Link to="/vendor-search">
               <Button variant="outline" className="border-primary/20 hover:bg-primary/5 hover:text-primary transition-colors">Back to Search</Button>
@@ -438,13 +438,16 @@ const VendorRegistration = () => {
                       name="registration_number"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Business Registration Number</FormLabel>
+                          <FormLabel>CAC Registration Number (RC Number) *</FormLabel>
                           <FormControl>
                             <div className="relative">
                               <FileText className="absolute left-3 top-3.5 h-5 w-5 text-muted-foreground" />
-                              <Input placeholder="CAC Registration Number (optional)" className="pl-10 h-12 glass-input" {...field} />
+                              <Input placeholder="e.g. RC1234567" className="pl-10 h-12 glass-input" {...field} />
                             </div>
                           </FormControl>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Your CAC RC number is used to automatically verify your business. Verified vendors get approved instantly and are listed sooner.
+                          </p>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -492,15 +495,15 @@ const VendorRegistration = () => {
                     </div>
 
                     <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-xl p-6">
-                      <h3 className="font-semibold mb-2 flex items-center gap-2 text-green-700">
+                      <h3 className="font-semibold mb-3 flex items-center gap-2 text-green-700">
                         <CheckCircle2 className="h-5 w-5" />
                         What happens next?
                       </h3>
                       <ul className="space-y-2 text-sm text-muted-foreground ml-7">
-                        <li>• Our team will review your application within 48 hours</li>
-                        <li>• You'll receive an email once approved</li>
-                        <li>• Start receiving bookings immediately after approval</li>
-                        <li>• Get featured as a verified vendor on the platform</li>
+                        <li>• Your RC number is checked against the CAC database automatically</li>
+                        <li>• If your business name matches the CAC record, you're <span className="font-semibold text-green-700">approved instantly</span></li>
+                        <li>• If there's a mismatch, our team reviews within 48 hours</li>
+                        <li>• Verified vendors appear in search results and can receive bookings</li>
                       </ul>
                     </div>
                   </div>

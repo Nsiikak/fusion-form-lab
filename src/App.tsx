@@ -13,7 +13,8 @@ import VendorSearch from "./pages/VendorSearch";
 import VendorRegistration from "./pages/VendorRegistration";
 import CustomerDashboard from "./pages/CustomerDashboard";
 import VendorDashboard from "./pages/VendorDashboard";
-import VendorDetails from "./pages/VendorDetails"; // 1. Import VendorDetails
+import VendorDetails from "./pages/VendorDetails";
+import VendorProfile from "./pages/VendorProfile";
 
 const queryClient = new QueryClient();
 
@@ -44,6 +45,14 @@ const App = () => (
               element={
                 <ProtectedRoute requiredRole="vendor">
                   <VendorDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute requiredRole="vendor">
+                  <VendorProfile />
                 </ProtectedRoute>
               }
             />

@@ -7,6 +7,7 @@ from app.entities.vendor.schema import VendorCreate
 from app.entities.user.model import User, UserRole
 from app.entities.user.service import UserService
 from app.core.security import get_password_hash
+from app.services.mono_cac import mono_cac_service
 
 class VendorService:
     @staticmethod
@@ -42,6 +43,27 @@ class VendorService:
         db.add(db_user)
         db.flush()  # Flush to get user ID
         
+        # Run CAC verification if RC number is provided
+        verification_status = VerificationStatus.PENDING
+        cac_id = None
+        cac_verified_name = None
+        cac_verification_attempted = False
+
+        if vendor_data.registration_number:
+            cac_verification_attempted = True
+            try:
+                cac_result = mono_cac_service.verify_vendor(
+                    rc_number=vendor_data.registration_number,
+                    business_name=vendor_data.business_name,
+                )
+                cac_id = cac_result.get("cac_id")
+                cac_verified_name = cac_result.get("cac_verified_name")
+                if cac_result.get("verified"):
+                    verification_status = VerificationStatus.APPROVED
+            except Exception:
+                # Never block registration if Mono is down
+                pass
+
         # Create vendor profile
         db_vendor = Vendor(
             user_id=db_user.id,
@@ -53,13 +75,16 @@ class VendorService:
             starting_price=vendor_data.starting_price,
             business_size=vendor_data.business_size,
             registration_number=vendor_data.registration_number,
-            verification_status=VerificationStatus.PENDING
+            verification_status=verification_status,
+            cac_id=cac_id,
+            cac_verified_name=cac_verified_name,
+            cac_verification_attempted=cac_verification_attempted,
         )
-        
+
         db.add(db_vendor)
         db.commit()
         db.refresh(db_vendor)
-        
+
         return db_vendor
     
     @staticmethod
@@ -79,19 +104,19 @@ class VendorService:
             )
         
         # Update fields
-        for key, value in vendor_data.dict(exclude_unset=True).items():
+        for key, value in vendor_data.items():
             setattr(vendor, key, value)
-            
+
         # usage of paystack service to create recipient if bank details change
-        if vendor_data.account_number and vendor_data.bank_code:
+        if vendor_data.get("account_number") and vendor_data.get("bank_code"):
             try:
                 from app.services.paystack import paystack_service
                 # Get bank name for recipient creation (optional, but good for data)
                 # For now just use business name
                 recipient_code = paystack_service.create_transfer_recipient(
                     name=vendor.business_name,
-                    account_number=vendor_data.account_number,
-                    bank_code=vendor_data.bank_code
+                    account_number=vendor_data.get("account_number"),
+                    bank_code=vendor_data.get("bank_code")
                 )
                 vendor.recipient_code = recipient_code
             except Exception as e:
@@ -104,6 +129,43 @@ class VendorService:
         db.refresh(vendor)
         return vendor
     
+    @staticmethod
+    def re_verify_vendor(db: Session, vendor_id: int, user_id: int) -> Vendor:
+        """Re-run CAC verification for a vendor (e.g. after adding RC number)."""
+        vendor = VendorService.get_vendor_by_id(db, vendor_id)
+        if not vendor:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vendor not found")
+        if vendor.user_id != user_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized")
+        if not vendor.registration_number:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No registration number on file. Please update your profile with your RC number first."
+            )
+
+        vendor.cac_verification_attempted = True
+        try:
+            cac_result = mono_cac_service.verify_vendor(
+                rc_number=vendor.registration_number,
+                business_name=vendor.business_name,
+            )
+            vendor.cac_id = cac_result.get("cac_id")
+            vendor.cac_verified_name = cac_result.get("cac_verified_name")
+            if cac_result.get("verified"):
+                vendor.verification_status = VerificationStatus.APPROVED
+            else:
+                # Keep current status but surface the reason via the response
+                pass
+            db.commit()
+            db.refresh(vendor)
+            return vendor, cac_result
+        except Exception as e:
+            db.commit()
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"CAC verification service unavailable: {str(e)}"
+            )
+
     @staticmethod
     def list_vendors(
         db: Session,

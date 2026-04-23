@@ -64,6 +64,33 @@ async def update_my_vendor(
     update_data = vendor_update.model_dump(exclude_unset=True)
     return VendorService.update_vendor(db, vendor.id, update_data, current_user.id)
 
+@router.post("/me/re-verify")
+async def re_verify_vendor(
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """Re-run CAC verification for the current vendor's RC number."""
+    if current_user.role.value != "vendor":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only vendors can access this endpoint")
+
+    vendor = VendorService.get_vendor_by_user_id(db, current_user.id)
+    if not vendor:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vendor profile not found")
+
+    vendor_obj, cac_result = VendorService.re_verify_vendor(db, vendor.id, current_user.id)
+
+    return {
+        "vendor": schema.VendorResponse.model_validate(vendor_obj),
+        "cac": {
+            "found": cac_result.get("found"),
+            "verified": cac_result.get("verified"),
+            "cac_verified_name": cac_result.get("cac_verified_name"),
+            "similarity": cac_result.get("similarity"),
+            "reason": cac_result.get("reason"),
+        }
+    }
+
+
 @router.get("", response_model=schema.VendorListResponse)
 async def list_vendors(
     category: Optional[VendorCategory] = Query(None, description="Filter by category"),

@@ -5,8 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Footer } from "@/components/Footer";
-import { Calendar, MapPin, Star, Clock, CheckCircle2, Package, LogOut, Loader2, CreditCard, ChevronRight } from "lucide-react";
+import { Calendar, MapPin, Star, Clock, CheckCircle2, Package, LogOut, Loader2, CreditCard, ChevronRight, Utensils, Palette, Camera, Music, Truck, Building2, Store } from "lucide-react";
 import logo from "@/assets/plagohive-logo.svg";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -23,17 +22,15 @@ const RecommendedVendors = () => {
     },
   });
 
-  const getCategoryEmoji = (category: string) => {
-    const emojiMap: Record<string, string> = {
-      catering: "🍽️",
-      decoration: "🎨",
-      photography: "📸",
-      entertainment: "🎵",
-      logistics: "🚚",
-      venue: "🏛️",
-    };
-    return emojiMap[category] || "🏢";
+  const categoryIconMap: Record<string, React.ElementType> = {
+    catering: Utensils,
+    decoration: Palette,
+    photography: Camera,
+    entertainment: Music,
+    logistics: Truck,
+    venue: Building2,
   };
+  const getCategoryIcon = (category: string): React.ElementType => categoryIconMap[category] || Store;
 
   const getCategoryDisplayName = (category: string) => {
     const nameMap: Record<string, string> = {
@@ -67,16 +64,18 @@ const RecommendedVendors = () => {
       <h2 className="text-2xl font-bold mb-6">Recommended for You</h2>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {recommendedVendors.map((vendor: any) => (
-          <Link key={vendor.id} to={`/vendor-search`}>
-            <Card className="glass-panel overflow-hidden hover:shadow-[var(--shadow-3d)] transition-all hover:-translate-y-1 cursor-pointer group">
-              <div className="aspect-video bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center text-6xl group-hover:scale-105 transition-transform duration-500">
-                {getCategoryEmoji(vendor.category)}
+          <Link key={vendor.id} to={`/vendors/${vendor.id}`}>
+            <Card className="bg-white border border-border overflow-hidden hover:shadow-[var(--shadow-3d)] transition-all hover:-translate-y-1 cursor-pointer group">
+              <div className="aspect-video bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center group-hover:scale-105 transition-transform duration-300">
+                {(() => { const Icon = getCategoryIcon(vendor.category); return <Icon className="h-10 w-10 text-primary/40" />; })()}
               </div>
               <div className="p-6">
-                <div className="flex items-center gap-2 mb-3">
-                  <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                  <span className="font-semibold">4.8</span>
-                </div>
+                {vendor.average_rating != null && (
+                  <div className="flex items-center gap-2 mb-3">
+                    <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                    <span className="font-semibold">{Number(vendor.average_rating).toFixed(1)}</span>
+                  </div>
+                )}
                 <h3 className="font-bold mb-2 group-hover:text-primary transition-colors text-lg">{vendor.business_name}</h3>
                 <p className="text-sm text-muted-foreground">
                   {getCategoryDisplayName(vendor.category)}
@@ -151,7 +150,7 @@ const CustomerDashboard = () => {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-3">
           <div className="flex items-center justify-between">
             <Link to="/">
-              <img src={logo} alt="Plagohive" className="h-10" />
+              <img src={logo} alt="Plagohive" className="h-12" />
             </Link>
             <nav className="hidden md:flex items-center gap-6">
               <Link to="/vendor-search" className="text-sm font-medium hover:text-primary transition-colors">Find Vendors</Link>
@@ -185,7 +184,7 @@ const CustomerDashboard = () => {
 
           {/* Quick Stats */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12 animate-fade-in-up [animation-delay:200ms]">
-            <Card className="glass-panel p-6 hover:shadow-[var(--shadow-elevated)] transition-all hover:bg-white/70">
+            <Card className="bg-white border border-border p-6 hover:shadow-[var(--shadow-elevated)] transition-all">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground mb-1">Upcoming Events</p>
@@ -199,7 +198,7 @@ const CustomerDashboard = () => {
               </div>
             </Card>
 
-            <Card className="glass-panel p-6 hover:shadow-[var(--shadow-elevated)] transition-all hover:bg-white/70">
+            <Card className="bg-white border border-border p-6 hover:shadow-[var(--shadow-elevated)] transition-all">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground mb-1">Active Bookings</p>
@@ -213,7 +212,7 @@ const CustomerDashboard = () => {
               </div>
             </Card>
 
-            <Card className="glass-panel p-6 hover:shadow-[var(--shadow-elevated)] transition-all hover:bg-white/70">
+            <Card className="bg-white border border-border p-6 hover:shadow-[var(--shadow-elevated)] transition-all">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground mb-1">Confirmed</p>
@@ -227,7 +226,7 @@ const CustomerDashboard = () => {
               </div>
             </Card>
 
-            <Card className="glass-panel p-6 hover:shadow-[var(--shadow-elevated)] transition-all hover:bg-white/70">
+            <Card className="bg-white border border-border p-6 hover:shadow-[var(--shadow-elevated)] transition-all">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground mb-1">Pending</p>
@@ -265,7 +264,7 @@ const CustomerDashboard = () => {
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 </div>
               ) : upcomingEvents.length === 0 ? (
-                <Card className="glass-panel p-12 text-center border-dashed border-2 border-primary/20 bg-primary/5">
+                <Card className="bg-white border-2 border-dashed border-primary/20 p-12 text-center">
                   <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
                     <Calendar className="h-8 w-8 text-primary/50" />
                   </div>
@@ -284,7 +283,7 @@ const CustomerDashboard = () => {
                     const totalCost = confirmedEventBookings.reduce((sum: number, b: any) => sum + Number(b.price), 0);
 
                     return (
-                      <Card key={event.id} className="glass-panel p-6 hover:shadow-[var(--shadow-3d)] transition-all">
+                      <Card key={event.id} className="bg-white border border-border p-6 hover:shadow-[var(--shadow-3d)] transition-all">
                         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                           <div className="space-y-4">
                             <div className="flex items-center gap-3">
@@ -338,7 +337,7 @@ const CustomerDashboard = () => {
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 </div>
               ) : bookings.length === 0 ? (
-                <Card className="glass-panel p-12 text-center border-dashed border-2 border-primary/20 bg-primary/5">
+                <Card className="bg-white border-2 border-dashed border-primary/20 p-12 text-center">
                   <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
                     <CreditCard className="h-8 w-8 text-primary/50" />
                   </div>
@@ -351,7 +350,7 @@ const CustomerDashboard = () => {
               ) : (
                 <div className="space-y-4">
                   {bookings.map((booking: any) => (
-                    <Card key={booking.id} className="glass-panel p-6 hover:shadow-lg transition-shadow">
+                    <Card key={booking.id} className="bg-white border border-border p-6 hover:shadow-lg transition-shadow">
                       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                         <div className="space-y-3">
                           <div className="flex items-center gap-3 flex-wrap">
@@ -397,7 +396,8 @@ const CustomerDashboard = () => {
                                 onClick={async () => {
                                   try {
                                     await api.bookings.updateStatus(booking.id, "cancelled");
-                                    window.location.reload();
+                                    toast.success("Booking cancelled.");
+                                    queryClient.invalidateQueries({ queryKey: ["bookings"] });
                                   } catch (error) {
                                     toast.error("Failed to cancel booking");
                                   }
@@ -442,7 +442,7 @@ const CustomerDashboard = () => {
                                 Rate Provider
                               </Button>
                             )}
-                            <Button size="sm" className="shadow-md">View Details</Button>
+                            <Button size="sm" className="shadow-md" onClick={() => navigate(`/vendors/${booking.vendor_id}`)}>View Details</Button>
                           </div>
                         </div>
                       </div>

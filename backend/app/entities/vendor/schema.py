@@ -41,7 +41,11 @@ class VendorResponse(VendorBase):
     bank_code: Optional[str] = None
     account_number: Optional[str] = None
     # We do not expose recipient_code
-    
+    # CAC verification
+    cac_id: Optional[str] = None
+    cac_verified_name: Optional[str] = None
+    cac_verification_attempted: bool = False
+
     created_at: datetime
     updated_at: Optional[datetime] = None
 

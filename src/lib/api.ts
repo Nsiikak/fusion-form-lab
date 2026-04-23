@@ -121,6 +121,10 @@ export const api = {
       const response = await apiClient.put("/api/vendors/me", data);
       return response.data;
     },
+    reVerify: async () => {
+      const response = await apiClient.post("/api/vendors/me/re-verify");
+      return response.data;
+    },
     list: async (params?: {
       category?: string;
       location?: string;
