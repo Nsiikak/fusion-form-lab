@@ -24,3 +24,18 @@ dist-ssr
 *.sw?
 
 .claude
+
+# Environment variables (contain secrets)
+.env
+.env.*
+!.env.example
+
+# Local image uploads (dev only — production uses Cloudinary)
+backend/uploads/
+
+# Python
+backend/venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/**/*.pyc
+backend/**/*.pyo
