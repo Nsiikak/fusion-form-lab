@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,9 +14,21 @@ import {
 import {
   Building2, Mail, Phone, MapPin, DollarSign, FileText,
   LogOut, ArrowLeft, Loader2, CheckCircle2, Clock, XCircle,
-  User, Settings, Star, ShieldCheck, RefreshCw
+  User, Settings, Star, ShieldCheck, RefreshCw, Camera, Upload,
+  Image as ImageIcon, X, Utensils, Palette, Music, Truck
 } from "lucide-react";
-import logo from "@/assets/plagohive-logo.svg";
+
+const categoryIconMap: Record<string, React.ElementType> = {
+  catering: Utensils,
+  decoration: Palette,
+  photography: Camera,
+  entertainment: Music,
+  logistics: Truck,
+  venue: Building2,
+};
+
+const getCategoryIcon = (category: string): React.ElementType =>
+  categoryIconMap[category] || Building2;
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api";
@@ -29,6 +41,10 @@ const VendorProfile = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingBank, setIsSavingBank] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isUploadingProfile, setIsUploadingProfile] = useState(false);
+  const [isUploadingGallery, setIsUploadingGallery] = useState(false);
+  const profileImageInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   const { data: vendor, isLoading } = useQuery({
     queryKey: ["vendor-profile"],
@@ -89,6 +105,50 @@ const VendorProfile = () => {
     }
   };
 
+  const handleProfileImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingProfile(true);
+    try {
+      await api.vendors.uploadImage(file, "profile");
+      toast.success("Profile image updated!");
+      queryClient.invalidateQueries({ queryKey: ["vendor-profile"] });
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail || "Failed to upload image");
+    } finally {
+      setIsUploadingProfile(false);
+      if (profileImageInputRef.current) profileImageInputRef.current.value = "";
+    }
+  };
+
+  const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    setIsUploadingGallery(true);
+    try {
+      for (const file of files) {
+        await api.vendors.uploadImage(file, "gallery");
+      }
+      toast.success(`${files.length} photo${files.length > 1 ? "s" : ""} added!`);
+      queryClient.invalidateQueries({ queryKey: ["vendor-profile"] });
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail || "Failed to upload photos");
+    } finally {
+      setIsUploadingGallery(false);
+      if (galleryInputRef.current) galleryInputRef.current.value = "";
+    }
+  };
+
+  const handleDeleteGalleryImage = async (url: string) => {
+    try {
+      await api.vendors.deleteGalleryImage(url);
+      toast.success("Photo removed");
+      queryClient.invalidateQueries({ queryKey: ["vendor-profile"] });
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail || "Failed to remove photo");
+    }
+  };
+
   const handleReVerify = async () => {
     setIsVerifying(true);
     try {
@@ -135,7 +195,7 @@ const VendorProfile = () => {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-3">
           <div className="flex items-center justify-between">
             <Link to="/">
-              <img src={logo} alt="Plagohive" className="h-12" />
+              <img src="/Plagohive.svg" alt="Plagohive" className="h-12 w-auto object-contain" />
             </Link>
             <nav className="hidden md:flex items-center gap-4">
               <Link to="/vendor-dashboard">
@@ -178,8 +238,35 @@ const VendorProfile = () => {
               {/* Profile header card */}
               <div className="bg-white border border-border rounded-2xl p-6 sm:p-8">
                 <div className="flex flex-col sm:flex-row sm:items-start gap-5">
-                  <div className="w-16 h-16 bg-gradient-to-br from-primary to-primary-glow rounded-2xl flex items-center justify-center text-white font-bold text-2xl flex-shrink-0 shadow-sm">
-                    {vendor.business_name?.[0] || "V"}
+                  <div
+                    className="relative w-16 h-16 flex-shrink-0 cursor-pointer group"
+                    onClick={() => profileImageInputRef.current?.click()}
+                    title="Change profile image"
+                  >
+                    {vendor.profile_image_url ? (
+                      <img
+                        src={vendor.profile_image_url}
+                        alt={vendor.business_name}
+                        className="w-16 h-16 rounded-2xl object-cover shadow-sm"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 bg-gradient-to-br from-primary/10 to-accent/10 border border-border rounded-2xl flex items-center justify-center shadow-sm">
+                        {(() => { const Icon = getCategoryIcon(vendor.category); return <Icon className="h-7 w-7 text-primary/60" />; })()}
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-black/50 rounded-2xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      {isUploadingProfile
+                        ? <Loader2 className="h-5 w-5 text-white animate-spin" />
+                        : <Camera className="h-5 w-5 text-white" />
+                      }
+                    </div>
+                    <input
+                      ref={profileImageInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      onChange={handleProfileImageUpload}
+                    />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-3 mb-1">
@@ -322,6 +409,80 @@ const VendorProfile = () => {
                       <ShieldCheck className="h-3.5 w-3.5" />
                       Verified via CAC — matched "{vendor.cac_verified_name}"
                     </div>
+                  )}
+                </div>
+
+                {/* Service Photos Gallery */}
+                <div className="bg-white border border-border rounded-2xl p-6 lg:col-span-2">
+                  <div className="flex items-center justify-between mb-5">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
+                        <ImageIcon className="h-4 w-4 text-primary" />
+                      </div>
+                      <div>
+                        <h2 className="text-base font-bold text-foreground">Service Photos</h2>
+                        <p className="text-xs text-muted-foreground">Showcase your work to attract customers</p>
+                      </div>
+                    </div>
+                    <label className="cursor-pointer">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5 pointer-events-none"
+                        disabled={isUploadingGallery}
+                        asChild
+                      >
+                        <span>
+                          {isUploadingGallery
+                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            : <Upload className="h-3.5 w-3.5" />
+                          }
+                          Add Photos
+                        </span>
+                      </Button>
+                      <input
+                        ref={galleryInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        multiple
+                        className="hidden"
+                        onChange={handleGalleryUpload}
+                      />
+                    </label>
+                  </div>
+
+                  {vendor.gallery_images && vendor.gallery_images.length > 0 ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                      {vendor.gallery_images.map((url: string) => (
+                        <div key={url} className="relative group aspect-square">
+                          <img
+                            src={url}
+                            alt=""
+                            className="w-full h-full object-cover rounded-xl"
+                          />
+                          <button
+                            onClick={() => handleDeleteGalleryImage(url)}
+                            className="absolute top-1.5 right-1.5 bg-black/60 hover:bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-all"
+                            title="Remove photo"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <label className="block border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition-colors">
+                      <ImageIcon className="h-10 w-10 mx-auto mb-3 text-muted-foreground/40" />
+                      <p className="text-sm font-medium text-muted-foreground">No photos yet</p>
+                      <p className="text-xs text-muted-foreground/70 mt-1">Click to upload and showcase your services</p>
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        multiple
+                        className="hidden"
+                        onChange={handleGalleryUpload}
+                      />
+                    </label>
                   )}
                 </div>
 

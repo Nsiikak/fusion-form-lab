@@ -1,7 +1,6 @@
 import axios, { AxiosInstance, AxiosError } from "axios";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
-// https://plagohive-backend.onrender.com
+const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
@@ -123,6 +122,22 @@ export const api = {
     },
     reVerify: async () => {
       const response = await apiClient.post("/api/vendors/me/re-verify");
+      return response.data;
+    },
+    uploadImage: async (file: File, imageType: "profile" | "gallery" = "profile") => {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await apiClient.post(
+        `/api/vendors/me/images?image_type=${imageType}`,
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
+      return response.data;
+    },
+    deleteGalleryImage: async (url: string) => {
+      const response = await apiClient.delete(
+        `/api/vendors/me/images?url=${encodeURIComponent(url)}`
+      );
       return response.data;
     },
     list: async (params?: {

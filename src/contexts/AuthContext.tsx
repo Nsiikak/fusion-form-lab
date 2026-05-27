@@ -16,14 +16,14 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<User>;
   register: (data: {
     email: string;
     password: string;
     full_name?: string;
     phone_number?: string;
     role?: 'customer' | 'vendor' | 'admin';
-  }) => Promise<void>;
+  }) => Promise<User>;
   logout: () => void;
   refreshUser: () => Promise<void>;
 }
@@ -65,11 +65,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string): Promise<User> => {
     try {
       await api.auth.login(email, password);
       const userData = await api.auth.getCurrentUser();
       setUser(userData);
+      return userData;
     } catch (error: any) {
       throw new Error(error.response?.data?.detail || 'Login failed');
     }
@@ -81,11 +82,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     full_name?: string;
     phone_number?: string;
     role?: 'customer' | 'vendor' | 'admin';
-  }) => {
+  }): Promise<User> => {
     try {
       await api.auth.register(data);
-      // Auto-login after registration
-      await login(data.email, data.password);
+      return await login(data.email, data.password);
     } catch (error: any) {
       throw new Error(error.response?.data?.detail || 'Registration failed');
     }

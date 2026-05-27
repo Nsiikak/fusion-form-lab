@@ -2,51 +2,68 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* Plagohive design system — based on revamp.html
+ * Typography: Sora (headings) + Plus Jakarta Sans (body)
+ * Brand: Blue #1565C0 primary, Orange #F57C00 accent, Dark #0D1B2A
+ * All colors MUST be HSL for Tailwind token consumption.
+ */
 
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 222 47% 11%;
+    --foreground: 215 51% 11%;            /* #0D1B2A */
 
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 215 51% 11%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover-foreground: 215 51% 11%;
 
-    /* Plagohive brand colors - Blue primary */
-    --primary: 221 83% 53%;
+    /* Primary — Plagohive Blue #1565C0 */
+    --primary: 210 79% 42%;
     --primary-foreground: 0 0% 100%;
-    --primary-glow: 221 83% 65%;
+    --primary-glow: 210 79% 52%;          /* #1976D2 */
+    --primary-deep: 214 90% 34%;          /* #0D47A1 */
+    --primary-light: 214 100% 94%;        /* #E3F0FF */
+    --primary-pale: 214 100% 97%;         /* #F0F7FF */
 
-    /* Yellow accent */
-    --secondary: 43 96% 56%;
-    --secondary-foreground: 222 47% 11%;
-
-    /* Orange warmth */
-    --accent: 25 95% 53%;
+    /* Accent — Plagohive Orange #F57C00 */
+    --accent: 29 100% 48%;
     --accent-foreground: 0 0% 100%;
+    --accent-deep: 19 100% 45%;           /* #E65100 */
+    --accent-mid: 30 99% 51%;             /* #FB8C00 */
+    --accent-light: 36 100% 94%;          /* #FFF3E0 */
 
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
+    /* Secondary kept as surface off-white */
+    --secondary: 220 14% 97%;             /* #F9FAFB */
+    --secondary-foreground: 215 51% 11%;
+
+    --muted: 220 14% 97%;
+    --muted-foreground: 220 9% 46%;       /* #6B7280 */
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 214 32% 91%;
+    --border: 214 86% 42% / 0.10;         /* rgba(21,101,192,.10) */
     --input: 214 32% 91%;
-    --ring: 221 83% 53%;
+    --ring: 210 79% 42%;
 
     --radius: 0.75rem;
 
     /* Custom design tokens */
-    --gradient-hero: linear-gradient(135deg, hsl(221 83% 53%) 0%, hsl(25 95% 53%) 100%);
-    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(210 40% 98%) 100%);
-    --shadow-3d: 0 20px 60px -15px hsl(221 83% 53% / 0.3);
-    --shadow-elevated: 0 10px 40px -10px hsl(221 83% 53% / 0.2);
+    --gradient-brand: linear-gradient(90deg, hsl(210 79% 42%), hsl(29 100% 48%));
+    --gradient-hero: radial-gradient(ellipse 70% 60% at 80% 20%, hsl(210 79% 42% / 0.06) 0%, transparent 70%),
+                     radial-gradient(ellipse 50% 40% at 10% 80%, hsl(29 100% 48% / 0.05) 0%, transparent 60%),
+                     hsl(228 100% 98%);
+    --gradient-testimonial: linear-gradient(135deg, hsl(214 90% 34%) 0%, hsl(210 79% 42%) 55%, hsl(232 64% 31%) 100%);
+
+    --shadow-sm: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+    --shadow-md: 0 4px 16px rgba(0,0,0,.08), 0 1px 4px rgba(0,0,0,.04);
+    --shadow-lg: 0 12px 48px rgba(13,27,42,.12), 0 4px 16px rgba(13,27,42,.06);
+    --shadow-elevated: 0 8px 32px hsl(210 79% 42% / 0.12);
+    --shadow-primary: 0 2px 8px hsl(210 79% 42% / 0.25);
+    --shadow-primary-lg: 0 4px 16px hsl(210 79% 42% / 0.35);
+
     --transition-smooth: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   }
 }
@@ -56,22 +73,27 @@ All colors MUST be HSL.
     @apply border-border;
   }
 
-  body {
-    @apply bg-background text-foreground;
-    font-family: 'Inter', sans-serif;
+  html {
+    scroll-behavior: smooth;
   }
 
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6 {
-    font-family: 'Inter', sans-serif;
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Sora', system-ui, sans-serif;
+    letter-spacing: -0.02em;
   }
 }
 
 @layer utilities {
+  .font-display {
+    font-family: 'Sora', system-ui, sans-serif;
+  }
+
   .glass-panel {
     @apply bg-white/10 backdrop-blur-xl border border-white/20 shadow-xl;
   }
@@ -80,11 +102,39 @@ All colors MUST be HSL.
     @apply bg-white/80 border-white/20 focus:border-primary/50 focus:ring-primary/20 backdrop-blur-sm transition-all duration-300;
   }
 
-  .text-gradient {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary via-secondary to-accent;
+  .text-gradient-brand {
+    @apply bg-clip-text text-transparent;
+    background-image: var(--gradient-brand);
   }
 
-  .text-gradient-hero {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-white to-white/80;
+  .bg-gradient-brand {
+    background-image: var(--gradient-brand);
+  }
+
+  .section-label {
+    @apply text-[11.5px] font-bold uppercase tracking-[0.08em] mb-3.5 text-accent;
+  }
+  .section-label-blue { color: hsl(var(--primary)); }
+
+  .section-title {
+    @apply font-display font-extrabold text-foreground leading-[1.1] mb-4;
+    font-size: clamp(28px, 3vw, 44px);
+    letter-spacing: -0.035em;
+  }
+
+  .section-sub {
+    @apply text-muted-foreground leading-relaxed font-normal;
+    font-size: 16px;
+    max-width: 520px;
+  }
+
+  .reveal {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity .6s ease, transform .6s ease;
+  }
+  .reveal.visible {
+    opacity: 1;
+    transform: translateY(0);
   }
 }

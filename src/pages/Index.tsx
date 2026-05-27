@@ -1,9 +1,12 @@
 import { Header } from "@/components/Header";
 import { Hero } from "@/components/Hero";
-import { ValueProposition } from "@/components/ValueProposition";
+import { TrustedStrip } from "@/components/TrustedStrip";
 import { HowItWorks } from "@/components/HowItWorks";
 import { Categories } from "@/components/Categories";
+import { ForCustomers } from "@/components/ForCustomers";
+import { ForVendors } from "@/components/ForVendors";
 import { TrustSection } from "@/components/TrustSection";
+import { Testimonials } from "@/components/Testimonials";
 import { CTA } from "@/components/CTA";
 import { Footer } from "@/components/Footer";
 
@@ -12,10 +15,13 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       <Header />
       <Hero />
-      <ValueProposition />
+      <TrustedStrip />
       <HowItWorks />
       <Categories />
+      <ForCustomers />
+      <ForVendors />
       <TrustSection />
+      <Testimonials />
       <CTA />
       <Footer />
     </div>

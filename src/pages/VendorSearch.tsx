@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Search, MapPin, Star, Filter, LogOut, Loader2, Utensils, Palette, Camera, Music, Truck, Building2, Store, CheckCircle2 } from "lucide-react";
 import { Footer } from "@/components/Footer";
-import logo from "@/assets/plagohive-logo.svg";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api";
@@ -116,7 +115,7 @@ const VendorSearch = () => {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <Link to="/">
-              <img src={logo} alt="Plagohive" className="h-12" />
+              <img src="/Plagohive.svg" alt="Plagohive" className="h-12 w-auto object-contain" />
             </Link>
             <nav className="hidden md:flex items-center gap-6">
               <Link to="/vendor-search" className="text-sm font-medium hover:text-primary transition-colors">Find Vendors</Link>
@@ -228,8 +227,16 @@ const VendorSearch = () => {
                     key={vendor.id}
                     className="overflow-hidden hover:shadow-elevated transition-all duration-300 hover:-translate-y-1 cursor-pointer"
                   >
-                    <div className="aspect-video bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center">
-                      {(() => { const Icon = getCategoryIcon(vendor.category); return <Icon className="h-12 w-12 text-primary/40" />; })()}
+                    <div className="aspect-video bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center overflow-hidden">
+                      {(vendor.profile_image_url || vendor.gallery_images?.[0]) ? (
+                        <img
+                          src={vendor.profile_image_url || vendor.gallery_images[0]}
+                          alt={vendor.business_name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        (() => { const Icon = getCategoryIcon(vendor.category); return <Icon className="h-12 w-12 text-primary/40" />; })()
+                      )}
                     </div>
                     <div className="p-6">
                       <div className="flex items-start justify-between mb-2">

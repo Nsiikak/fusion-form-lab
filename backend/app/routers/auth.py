@@ -8,6 +8,7 @@ from app.core.config import ACCESS_TOKEN_EXPIRE_MINUTES
 from app.entities.user import schema
 from app.entities.user.service import UserService
 from app.entities.user.model import User
+from app.services.email import send_welcome_email, send_login_notification, _fire_and_forget
 
 router = APIRouter()
 
@@ -17,7 +18,9 @@ async def register(
     db: Session = Depends(get_db)
 ):
     """Register a new user"""
-    return UserService.create_user(db, user_data)
+    user = UserService.create_user(db, user_data)
+    _fire_and_forget(send_welcome_email, user.email, user.full_name or user.email)
+    return user
 
 @router.post("/login", response_model=schema.Token)
 async def login(
@@ -26,21 +29,21 @@ async def login(
 ):
     """Login and get access token (OAuth2 form)"""
     user = UserService.authenticate_user(db, form_data.username, form_data.password)
-    
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
-    # Create access token
+
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user.email},
         expires_delta=access_token_expires
     )
-    
+
+    _fire_and_forget(send_login_notification, user.email, user.full_name or user.email, user.role.value)
     return {"access_token": access_token, "token_type": "bearer"}
 
 @router.post("/login-json", response_model=schema.Token)
@@ -50,21 +53,21 @@ async def login_json(
 ):
     """Login endpoint that accepts JSON (alternative to OAuth2 form)"""
     user = UserService.authenticate_user(db, login_data.email, login_data.password)
-    
+
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
-    # Create access token
+
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user.email},
         expires_delta=access_token_expires
     )
-    
+
+    _fire_and_forget(send_login_notification, user.email, user.full_name or user.email, user.role.value)
     return {"access_token": access_token, "token_type": "bearer"}
 
 @router.get("/me", response_model=schema.UserResponse)

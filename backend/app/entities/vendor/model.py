@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum, ForeignKey, Text, Numeric
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum, ForeignKey, Text, Numeric, JSON
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.core.database import Base
@@ -42,6 +42,10 @@ class Vendor(Base):
     bank_code = Column(String, nullable=True)
     account_number = Column(String, nullable=True)
     recipient_code = Column(String, nullable=True)
+
+    # Images
+    profile_image_url = Column(String, nullable=True)
+    gallery_images = Column(JSON, nullable=True)  # list of URLs
 
     # CAC Verification
     cac_id = Column(String, nullable=True)

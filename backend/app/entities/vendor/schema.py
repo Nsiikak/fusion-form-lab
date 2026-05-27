@@ -37,6 +37,9 @@ class VendorResponse(VendorBase):
     user_id: int
     verification_status: VerificationStatus
     is_active: bool
+    # Images
+    profile_image_url: Optional[str] = None
+    gallery_images: Optional[list[str]] = None
     # Bank details
     bank_code: Optional[str] = None
     account_number: Optional[str] = None

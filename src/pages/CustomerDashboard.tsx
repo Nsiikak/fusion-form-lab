@@ -6,7 +6,6 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar, MapPin, Star, Clock, CheckCircle2, Package, LogOut, Loader2, CreditCard, ChevronRight, Utensils, Palette, Camera, Music, Truck, Building2, Store } from "lucide-react";
-import logo from "@/assets/plagohive-logo.svg";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api";
@@ -150,7 +149,7 @@ const CustomerDashboard = () => {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-3">
           <div className="flex items-center justify-between">
             <Link to="/">
-              <img src={logo} alt="Plagohive" className="h-12" />
+              <img src="/Plagohive.svg" alt="Plagohive" className="h-12 w-auto object-contain" />
             </Link>
             <nav className="hidden md:flex items-center gap-6">
               <Link to="/vendor-search" className="text-sm font-medium hover:text-primary transition-colors">Find Vendors</Link>

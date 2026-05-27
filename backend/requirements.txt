@@ -8,4 +8,5 @@ python-multipart==0.0.12
 pydantic[email]==2.9.2
 python-dotenv==1.0.1
 requests==2.31.0
+cloudinary==1.41.0
 

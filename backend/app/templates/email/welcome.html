@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<title>Welcome to Plagohive</title>
+<style type="text/css">
+  body, table, td, p, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+  table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+  img { border: 0; height: auto; outline: none; text-decoration: none; }
+  @media screen and (max-width: 600px) {
+    .email-wrapper { padding: 12px !important; }
+    .email-card { border-radius: 8px !important; }
+    .content-pad { padding: 32px 24px !important; }
+    .header-pad { padding: 24px !important; }
+    .feat-cell { display: block !important; width: 100% !important; padding: 0 0 16px 0 !important; }
+  }
+</style>
+</head>
+<body style="margin:0;padding:0;background-color:#F4F4F5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#F4F4F5;">
+<tr><td align="center" class="email-wrapper" style="padding:40px 16px;">
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;">
+
+    <!-- Orange accent bar -->
+    <tr><td style="height:4px;background:#F57C00;border-radius:8px 8px 0 0;font-size:0;line-height:0;">&nbsp;</td></tr>
+
+    <!-- Header: logo -->
+    <tr>
+      <td class="header-pad" style="background:#ffffff;padding:28px 40px 24px;border-bottom:1px solid #E4E4E7;">
+        <img src="{frontend_url}/plagohive-email-logo.png" alt="Plagohive" width="140" height="42" style="display:block;width:140px;height:auto;" />
+      </td>
+    </tr>
+
+    <!-- Body -->
+    <tr>
+      <td class="content-pad email-card" style="background:#ffffff;padding:40px;border-top:none;">
+
+        <h1 style="margin:0 0 8px;font-size:26px;font-weight:700;color:#18181B;letter-spacing:-0.5px;line-height:1.2;">Welcome, {first_name}.</h1>
+        <p style="margin:0 0 28px;font-size:15px;color:#71717A;line-height:1.6;">You're now part of Africa's premier event marketplace.</p>
+
+        <p style="margin:0 0 24px;font-size:15px;color:#3F3F46;line-height:1.75;">
+          Your Plagohive account is ready. You can now browse and book from over 1,000 verified vendors
+          — caterers, decorators, photographers, entertainment, and more — all in one place.
+        </p>
+
+        <!-- Feature list — clean, no boxes -->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 32px;">
+          <tr>
+            <td style="padding:12px 0;border-top:1px solid #F4F4F5;font-size:14px;color:#3F3F46;line-height:1.5;">
+              <span style="color:#F57C00;font-weight:700;margin-right:10px;">→</span>
+              Search vendors by category, location, and budget
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:12px 0;border-top:1px solid #F4F4F5;font-size:14px;color:#3F3F46;line-height:1.5;">
+              <span style="color:#F57C00;font-weight:700;margin-right:10px;">→</span>
+              Every vendor is manually reviewed and verified before listing
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:12px 0;border-top:1px solid #F4F4F5;border-bottom:1px solid #F4F4F5;font-size:14px;color:#3F3F46;line-height:1.5;">
+              <span style="color:#F57C00;font-weight:700;margin-right:10px;">→</span>
+              Book and pay securely — all transactions go through Paystack
+            </td>
+          </tr>
+        </table>
+
+        <!-- CTA -->
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 36px;">
+          <tr>
+            <td style="border-radius:6px;background:#1565C0;">
+              <a href="{frontend_url}/vendor-search" style="display:inline-block;padding:14px 32px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;letter-spacing:0.1px;">
+                Browse Vendors
+              </a>
+            </td>
+          </tr>
+        </table>
+
+        <p style="margin:0;font-size:13px;color:#A1A1AA;line-height:1.6;">
+          Questions? Reply to this email or reach us at
+          <a href="mailto:support@plagohive.com" style="color:#1565C0;text-decoration:none;">support@plagohive.com</a>.
+          We typically respond within a few hours.
+        </p>
+
+      </td>
+    </tr>
+
+    <!-- Footer -->
+    <tr>
+      <td style="background:#F4F4F5;padding:24px 40px;border-top:1px solid #E4E4E7;">
+        <p style="margin:0 0 6px;font-size:12px;color:#A1A1AA;line-height:1.6;">
+          You received this because you created a Plagohive account with {email}.
+        </p>
+        <p style="margin:0;font-size:12px;color:#A1A1AA;">
+          © {year} Plagohive Ltd &nbsp;·&nbsp;
+          <a href="{frontend_url}/privacy" style="color:#A1A1AA;text-decoration:underline;">Privacy</a>
+          &nbsp;·&nbsp;
+          <a href="{frontend_url}/unsubscribe?token={unsubscribe_token}" style="color:#A1A1AA;text-decoration:underline;">Unsubscribe</a>
+        </p>
+      </td>
+    </tr>
+
+  </table>
+</td></tr>
+</table>
+</body>
+</html>

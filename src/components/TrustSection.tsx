@@ -5,29 +5,25 @@ const features = [
     icon: Shield,
     title: "Verified Vendors Only",
     description: "Every vendor goes through our rigorous verification process to ensure quality and reliability.",
-    iconBg: "bg-primary/10",
-    iconColor: "text-primary",
+    iconBg: "bg-[hsl(var(--primary-light))] text-primary",
   },
   {
     icon: Star,
     title: "Authentic Reviews",
     description: "Real feedback from real customers helps you make informed decisions with confidence.",
-    iconBg: "bg-secondary/20",
-    iconColor: "text-secondary-foreground",
+    iconBg: "bg-[hsl(var(--accent-light))] text-accent",
   },
   {
     icon: CreditCard,
     title: "Secure Payments",
     description: "Your payments are protected with industry-standard security and fraud prevention.",
-    iconBg: "bg-accent/10",
-    iconColor: "text-accent",
+    iconBg: "bg-[#E8F5E9] text-[#2E7D32]",
   },
   {
     icon: Award,
     title: "Quality Guarantee",
     description: "We stand behind every booking with our satisfaction guarantee and support team.",
-    iconBg: "bg-primary/10",
-    iconColor: "text-primary",
+    iconBg: "bg-[#EDE7F6] text-[#5E35B1]",
   },
 ];
 
@@ -40,51 +36,56 @@ const stats = [
 
 export const TrustSection = () => {
   return (
-    <section className="py-20 md:py-28 bg-muted/30">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-14">
-            <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full text-sm font-medium mb-4">
-              <Shield className="h-4 w-4" />
-              Built on Trust
-            </div>
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 text-foreground tracking-tight">
-              Your Peace of Mind is Our <span className="text-primary">Priority</span>
-            </h2>
-            <p className="text-muted-foreground max-w-xl mx-auto">
-              We've built a platform where trust and quality come first
-            </p>
+    <section className="py-24 px-[5vw] bg-secondary">
+      <div className="max-w-[1200px] mx-auto">
+        <div className="text-center mb-14">
+          <div className="inline-flex items-center gap-2 bg-[hsl(var(--primary-light))] text-primary px-4 py-2 rounded-full text-sm font-semibold mb-4">
+            <Shield className="h-4 w-4" />
+            Built on Trust
           </div>
+          <h2 className="section-title mx-auto">
+            Your Peace of Mind is Our <span className="text-gradient-brand">Priority</span>
+          </h2>
+          <p className="section-sub mx-auto">
+            We've built a platform where trust and quality come first.
+          </p>
+        </div>
 
-          <div className="grid md:grid-cols-2 gap-5 mb-10">
-            {features.map((feature) => (
-              <div
-                key={feature.title}
-                className="bg-white rounded-2xl border border-border hover:border-primary/30 hover:shadow-[var(--shadow-elevated)] transition-all duration-200 p-7 group"
-              >
-                <div className="flex items-start gap-4">
-                  <div className={`w-12 h-12 ${feature.iconBg} rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform duration-200`}>
-                    <feature.icon className={`h-6 w-6 ${feature.iconColor}`} />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-bold mb-2 text-foreground">{feature.title}</h3>
-                    <p className="text-muted-foreground text-sm leading-relaxed">{feature.description}</p>
-                  </div>
+        <div className="grid md:grid-cols-2 gap-5 mb-10 max-w-[1000px] mx-auto">
+          {features.map((f) => (
+            <div
+              key={f.title}
+              className="bg-white rounded-2xl border-[1.5px] border-border hover:border-primary hover:shadow-[var(--shadow-md)] hover:-translate-y-0.5 transition-all p-7"
+            >
+              <div className="flex items-start gap-4">
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${f.iconBg}`}>
+                  <f.icon className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-foreground mb-2">{f.title}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{f.description}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Stats bar */}
+        <div
+          className="rounded-3xl p-10 text-white shadow-[var(--shadow-lg)] max-w-[1000px] mx-auto"
+          style={{ background: "var(--gradient-brand)" }}
+        >
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+            {stats.map((stat) => (
+              <div key={stat.label}>
+                <div className="font-display text-3xl md:text-4xl font-extrabold mb-1 tabular-nums">
+                  {stat.value}
+                </div>
+                <div className="text-white/80 text-xs font-semibold uppercase tracking-wide">
+                  {stat.label}
                 </div>
               </div>
             ))}
-          </div>
-
-          {/* Stats bar */}
-          <div className="bg-gradient-to-r from-primary via-primary-glow to-accent rounded-2xl p-8 md:p-10 text-white shadow-lg">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
-              {stats.map((stat) => (
-                <div key={stat.label}>
-                  <div className="text-3xl md:text-4xl font-bold mb-1 tabular-nums">{stat.value}</div>
-                  <div className="text-white/75 text-xs font-medium uppercase tracking-wide">{stat.label}</div>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
       </div>

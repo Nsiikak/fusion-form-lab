@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -24,7 +24,6 @@ import {
 } from "@/components/ui/select";
 import { Footer } from "@/components/Footer";
 import { CheckCircle2, Upload, ArrowRight, Building2, User, Mail, Phone, MapPin, DollarSign, FileText } from "lucide-react";
-import logo from "@/assets/plagohive-logo.svg";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
@@ -69,6 +68,8 @@ const VendorRegistration = () => {
   const { refreshUser } = useAuth();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedPhotos, setSelectedPhotos] = useState<File[]>([]);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState<{
     step1?: Step1FormValues;
     step2?: Step2FormValues;
@@ -117,6 +118,15 @@ const VendorRegistration = () => {
     window.scrollTo(0, 0);
   };
 
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setSelectedPhotos((prev) => [...prev, ...files].slice(0, 5));
+  };
+
+  const removeSelectedPhoto = (index: number) => {
+    setSelectedPhotos((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = async (data: Step3FormValues) => {
     setIsSubmitting(true);
     try {
@@ -141,6 +151,18 @@ const VendorRegistration = () => {
       });
 
       await refreshUser();
+
+      // Upload selected service photos after registration
+      if (selectedPhotos.length > 0) {
+        try {
+          for (const photo of selectedPhotos) {
+            await api.vendors.uploadImage(photo, "gallery");
+          }
+        } catch {
+          toast.warning("Registered! Some photos failed to upload — you can add them from your profile.");
+        }
+      }
+
       toast.success("Vendor registration successful! Your application is pending review.");
       navigate("/vendor-dashboard");
     } catch (error: any) {
@@ -157,7 +179,7 @@ const VendorRegistration = () => {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <Link to="/">
-              <img src={logo} alt="Plagohive" className="h-12" />
+              <img src="/Plagohive.svg" alt="Plagohive" className="h-12 w-auto object-contain" />
             </Link>
             <Link to="/vendor-search">
               <Button variant="outline" className="border-primary/20 hover:bg-primary/5 hover:text-primary transition-colors">Back to Search</Button>
@@ -398,16 +420,46 @@ const VendorRegistration = () => {
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Upload Service Photos (Coming Soon)</label>
-                      <div className="border-2 border-dashed border-primary/20 bg-primary/5 rounded-xl p-8 text-center hover:border-primary/50 transition-all cursor-not-allowed opacity-70 group">
-                        <Upload className="h-12 w-12 mx-auto mb-4 text-primary group-hover:scale-110 transition-transform" />
-                        <p className="text-sm font-medium text-foreground">
-                          Click to upload or drag and drop
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          PNG, JPG up to 10MB
-                        </p>
-                      </div>
+                      <label className="text-sm font-medium">Upload Service Photos <span className="text-muted-foreground font-normal">(optional, up to 5)</span></label>
+                      {selectedPhotos.length > 0 && (
+                        <div className="grid grid-cols-3 gap-2 mb-2">
+                          {selectedPhotos.map((file, i) => (
+                            <div key={i} className="relative group aspect-square">
+                              <img
+                                src={URL.createObjectURL(file)}
+                                alt=""
+                                className="w-full h-full object-cover rounded-lg"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removeSelectedPhoto(i)}
+                                className="absolute top-1 right-1 bg-black/60 hover:bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-all"
+                              >
+                                <Upload className="h-3 w-3 rotate-45" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {selectedPhotos.length < 5 && (
+                        <label className="block border-2 border-dashed border-primary/20 bg-primary/5 rounded-xl p-6 text-center hover:border-primary/50 hover:bg-primary/10 transition-all cursor-pointer group">
+                          <Upload className="h-10 w-10 mx-auto mb-3 text-primary group-hover:scale-110 transition-transform" />
+                          <p className="text-sm font-medium text-foreground">
+                            Click to upload or drag and drop
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            PNG, JPG, WebP up to 5 MB each
+                          </p>
+                          <input
+                            ref={photoInputRef}
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            multiple
+                            className="hidden"
+                            onChange={handlePhotoSelect}
+                          />
+                        </label>
+                      )}
                     </div>
                   </div>
 

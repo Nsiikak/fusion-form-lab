@@ -21,7 +21,6 @@ import {
   AlertTriangle,
   RefreshCw,
 } from "lucide-react";
-import logo from "@/assets/plagohive-logo.svg";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api";
@@ -153,7 +152,7 @@ const VendorDashboard = () => {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-3">
           <div className="flex items-center justify-between">
             <Link to="/">
-              <img src={logo} alt="Plagohive" className="h-12" />
+              <img src="/Plagohive.svg" alt="Plagohive" className="h-12 w-auto object-contain" />
             </Link>
             <nav className="hidden md:flex items-center gap-6">
               <Link to="/vendor-dashboard" className="text-sm font-medium text-primary bg-primary/10 px-3 py-1.5 rounded-full">Dashboard</Link>
