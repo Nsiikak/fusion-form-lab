@@ -1,7 +1,8 @@
 import { Button } from "@/components/ui/button";
-import { Menu, X } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Menu, X, LogOut } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
+import { useAuth } from "@/hooks/useAuth";
 
 const navItems = [
   { name: "How It Works", href: "/#how-it-works" },
@@ -11,8 +12,18 @@ const navItems = [
 ];
 
 export const Header = () => {
+  const { user, isAuthenticated, logout } = useAuth();
+  const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+
+  const handleLogout = () => {
+    logout();
+    navigate("/");
+    setIsMenuOpen(false);
+  };
+
+  const dashboardPath = user?.role === "vendor" ? "/vendor-dashboard" : "/customer-dashboard";
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -52,20 +63,45 @@ export const Header = () => {
 
           {/* Desktop auth actions */}
           <div className="hidden md:flex items-center gap-2.5">
-            <Link
-              to="/login"
-              className="text-sm font-medium text-foreground/70 hover:text-primary hover:bg-[hsl(var(--primary-pale))] px-3.5 py-2 rounded-lg transition-colors"
-            >
-              Sign In
-            </Link>
-            <Link to="/register">
-              <Button
-                size="sm"
-                className="h-auto bg-primary hover:bg-[hsl(var(--primary-glow))] text-white font-semibold px-5 py-2.5 rounded-lg shadow-none"
-              >
-                Get Started →
-              </Button>
-            </Link>
+            {isAuthenticated ? (
+              <>
+                <Link
+                  to={dashboardPath}
+                  className="flex items-center gap-2 text-sm font-medium text-foreground/70 hover:text-primary hover:bg-[hsl(var(--primary-pale))] px-3.5 py-2 rounded-lg transition-colors"
+                >
+                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-primary to-accent text-white flex items-center justify-center font-bold text-xs">
+                    {(user?.full_name?.[0] || user?.email?.[0] || "U").toUpperCase()}
+                  </div>
+                  {user?.full_name?.split(" ")[0] || "Dashboard"}
+                </Link>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleLogout}
+                  className="h-auto px-3.5 py-2 text-sm font-medium text-destructive hover:text-destructive hover:bg-destructive/10"
+                >
+                  <LogOut className="h-4 w-4 mr-1.5" />
+                  Logout
+                </Button>
+              </>
+            ) : (
+              <>
+                <Link
+                  to="/login"
+                  className="text-sm font-medium text-foreground/70 hover:text-primary hover:bg-[hsl(var(--primary-pale))] px-3.5 py-2 rounded-lg transition-colors"
+                >
+                  Sign In
+                </Link>
+                <Link to="/register">
+                  <Button
+                    size="sm"
+                    className="h-auto bg-primary hover:bg-[hsl(var(--primary-glow))] text-white font-semibold px-5 py-2.5 rounded-lg shadow-none"
+                  >
+                    Get Started →
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Mobile toggle */}
@@ -92,18 +128,39 @@ export const Header = () => {
               {item.name}
             </a>
           ))}
-          <Link
-            to="/login"
-            onClick={() => setIsMenuOpen(false)}
-            className="text-[15px] font-medium text-foreground/70 hover:text-primary hover:bg-[hsl(var(--primary-pale))] px-2 py-3 rounded-lg transition-colors"
-          >
-            Sign In
-          </Link>
-          <Link to="/register" onClick={() => setIsMenuOpen(false)} className="mt-2">
-            <Button className="w-full h-auto bg-primary hover:bg-[hsl(var(--primary-glow))] text-white font-semibold py-3 rounded-lg">
-              Get Started →
-            </Button>
-          </Link>
+          {isAuthenticated ? (
+            <>
+              <Link
+                to={dashboardPath}
+                onClick={() => setIsMenuOpen(false)}
+                className="text-[15px] font-medium text-foreground/70 hover:text-primary hover:bg-[hsl(var(--primary-pale))] px-2 py-3 rounded-lg transition-colors"
+              >
+                Dashboard
+              </Link>
+              <button
+                onClick={handleLogout}
+                className="mt-2 text-[15px] font-medium text-destructive hover:bg-destructive/10 px-2 py-3 rounded-lg text-left transition-colors flex items-center gap-2"
+              >
+                <LogOut className="h-4 w-4" />
+                Logout
+              </button>
+            </>
+          ) : (
+            <>
+              <Link
+                to="/login"
+                onClick={() => setIsMenuOpen(false)}
+                className="text-[15px] font-medium text-foreground/70 hover:text-primary hover:bg-[hsl(var(--primary-pale))] px-2 py-3 rounded-lg transition-colors"
+              >
+                Sign In
+              </Link>
+              <Link to="/register" onClick={() => setIsMenuOpen(false)} className="mt-2">
+                <Button className="w-full h-auto bg-primary hover:bg-[hsl(var(--primary-glow))] text-white font-semibold py-3 rounded-lg">
+                  Get Started →
+                </Button>
+              </Link>
+            </>
+          )}
         </div>
       )}
     </>

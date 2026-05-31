@@ -17,6 +17,7 @@ from app.services.email import (
     send_booking_request_to_vendor,
     send_booking_accepted_to_customer,
     send_booking_declined_to_customer,
+    send_completion_pending_to_customer,
 )
 
 logger = logging.getLogger(__name__)
@@ -152,16 +153,21 @@ async def get_booking(
 async def update_booking_status(
     booking_id: int,
     new_status: BookingStatus = Query(..., description="New booking status"),
+    force: bool = Query(False, description="Admin override: skip event-date restriction"),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """Update booking status"""
+    # Only admins may use the force flag
+    admin_force = force and current_user.role.value == "admin"
+
     booking = BookingService.update_booking_status(
         db,
         booking_id,
         new_status,
         current_user.id,
-        current_user.role.value
+        current_user.role.value,
+        force=admin_force,
     )
 
     vendor = VendorService.get_vendor_by_id(db, booking.vendor_id)
@@ -181,6 +187,16 @@ async def update_booking_status(
                     booking.id,
                     vendor.business_name,
                     vendor.category.value,
+                    event_date,
+                    amount,
+                )
+            elif new_status == BookingStatus.AWAITING_CONFIRMATION:
+                _fire_and_forget(
+                    send_completion_pending_to_customer,
+                    customer.email,
+                    customer.full_name or customer.email,
+                    booking.id,
+                    vendor.business_name,
                     event_date,
                     amount,
                 )

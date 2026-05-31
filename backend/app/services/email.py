@@ -231,6 +231,46 @@ def send_vendor_approved_email(email: str, full_name: str, business_name: str) -
     return _send(email, f"🏆 Congratulations! {business_name} is now Plagohive Verified", html)
 
 
+def send_password_reset_email(email: str, full_name: str, token: str) -> bool:
+    first_name = (full_name or email).split()[0].capitalize()
+    frontend_url = FRONTEND_URL
+    reset_url = f"{frontend_url}/reset-password?token={token}"
+    html = _render(
+        _load_template("password_reset.html"),
+        first_name=first_name,
+        reset_url=reset_url,
+        **_base_vars(email),
+    )
+    return _send(email, "Reset your Plagohive password", html)
+
+
+def send_completion_pending_to_customer(
+    customer_email: str,
+    customer_name: str,
+    booking_id: int,
+    vendor_name: str,
+    event_date: str,
+    amount: str,
+) -> bool:
+    """Notify customer that vendor marked the event complete and payment will auto-release in 24h."""
+    first_name = (customer_name or customer_email).split()[0].capitalize()
+    dashboard_url = f"{FRONTEND_URL}/customer-dashboard"
+    html = f"""<!DOCTYPE html><html><body style="font-family:sans-serif;color:#1a1a2e;max-width:600px;margin:0 auto;padding:20px">
+<h2 style="color:#6c47ff">Your vendor has marked the event complete</h2>
+<p>Hi {first_name},</p>
+<p><strong>{vendor_name}</strong> has marked Booking <strong>#{booking_id}</strong> (event on {event_date}) as complete and your payment of <strong>₦{amount}</strong> is now held in escrow.</p>
+<p><strong>What happens next:</strong></p>
+<ul>
+<li>If you confirm the event went well, payment is released to {vendor_name} immediately.</li>
+<li>If you take no action within <strong>24 hours</strong>, payment is automatically released to the vendor.</li>
+<li>If you have a dispute, please contact Plagohive support before confirming.</li>
+</ul>
+<p style="margin:24px 0"><a href="{dashboard_url}" style="background:#6c47ff;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">Confirm or Review Booking</a></p>
+<p style="color:#888;font-size:12px">Plagohive &copy; {datetime.now().year}</p>
+</body></html>"""
+    return _send(customer_email, f"Action required: Confirm your event with {vendor_name}", html)
+
+
 def send_review_request(
     customer_email: str,
     customer_name: str,

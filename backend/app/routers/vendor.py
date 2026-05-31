@@ -6,6 +6,7 @@ from app.core.database import get_db
 from app.core.security import get_current_active_user
 from app.entities.user.model import User
 from app.entities.vendor import schema
+from app.entities.vendor.schema import VendorResponse, VendorPublicResponse
 from app.entities.vendor.model import VendorCategory, Vendor, VerificationStatus
 from app.entities.vendor.service import VendorService
 from app.services.email import _fire_and_forget, send_vendor_welcome_email, send_vendor_approved_email
@@ -13,7 +14,7 @@ from app.services.upload import upload_image, delete_image
 
 router = APIRouter()
 
-@router.post("/register", response_model=schema.VendorResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/register", response_model=VendorResponse, status_code=status.HTTP_201_CREATED)
 async def register_vendor(
     vendor_data: schema.VendorCreate,
     db: Session = Depends(get_db)
@@ -51,7 +52,7 @@ async def approve_vendor(
         )
     return {"message": f"{vendor.business_name} approved successfully"}
 
-@router.get("/me", response_model=schema.VendorResponse)
+@router.get("/me", response_model=VendorResponse)
 async def get_my_vendor(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
@@ -72,7 +73,7 @@ async def get_my_vendor(
     
     return vendor
 
-@router.put("/me", response_model=schema.VendorResponse)
+@router.put("/me", response_model=VendorResponse)
 async def update_my_vendor(
     vendor_update: schema.VendorUpdate,
     current_user: User = Depends(get_current_active_user),
@@ -123,7 +124,7 @@ async def re_verify_vendor(
     }
 
 
-@router.post("/me/images", response_model=dict)
+@router.post("/me/images", response_model=dict)  # returns {"url": ..., "vendor": VendorResponse}
 async def upload_vendor_image(
     image_type: str = Query("profile", description="'profile' or 'gallery'"),
     file: UploadFile = File(...),
@@ -154,7 +155,7 @@ async def upload_vendor_image(
     return {"url": url, "vendor": schema.VendorResponse.model_validate(vendor)}
 
 
-@router.delete("/me/images", response_model=schema.VendorResponse)
+@router.delete("/me/images", response_model=VendorResponse)
 async def remove_vendor_gallery_image(
     url: str = Query(..., description="URL of the gallery image to remove"),
     current_user: User = Depends(get_current_active_user),
@@ -179,7 +180,7 @@ async def remove_vendor_gallery_image(
     return vendor
 
 
-@router.get("", response_model=schema.VendorListResponse)
+@router.get("", response_model=schema.VendorListResponse)  # uses VendorPublicResponse inside
 async def list_vendors(
     category: Optional[VendorCategory] = Query(None, description="Filter by category"),
     location: Optional[str] = Query(None, description="Filter by location"),
@@ -212,7 +213,7 @@ async def list_vendors(
         "total_pages": total_pages
     }
 
-@router.get("/recommended", response_model=list[schema.VendorResponse])
+@router.get("/recommended", response_model=list[VendorPublicResponse])
 async def get_recommended_vendors(
     limit: int = Query(6, ge=1, le=20, description="Number of recommendations"),
     current_user: User = Depends(get_current_active_user),
@@ -272,7 +273,7 @@ async def get_recommended_vendors(
     
     return vendors_sorted[:limit]
 
-@router.get("/{vendor_id}", response_model=schema.VendorResponse)
+@router.get("/{vendor_id}", response_model=VendorPublicResponse)
 async def get_vendor(
     vendor_id: int,
     db: Session = Depends(get_db)

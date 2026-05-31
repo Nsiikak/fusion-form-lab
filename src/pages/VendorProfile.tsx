@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,10 +12,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Building2, Mail, Phone, MapPin, DollarSign, FileText,
+  Building2, Mail, Phone, MapPin, Banknote, FileText,
   LogOut, ArrowLeft, Loader2, CheckCircle2, Clock, XCircle,
   User, Settings, Star, ShieldCheck, RefreshCw, Camera, Upload,
-  Image as ImageIcon, X, Utensils, Palette, Music, Truck
+  Image as ImageIcon, X, Utensils, Palette, Music, Truck,
+  Plus, Pencil, Trash2, Package, ToggleLeft, ToggleRight
 } from "lucide-react";
 
 const categoryIconMap: Record<string, React.ElementType> = {
@@ -57,6 +58,84 @@ const VendorProfile = () => {
     queryFn: () => api.reviews.getVendorRating(vendor!.id),
     enabled: !!vendor,
   });
+
+  // Service items state
+  const [showAddItem, setShowAddItem] = useState(false);
+  const [editingItem, setEditingItem] = useState<any>(null);
+  const [itemForm, setItemForm] = useState({ name: "", description: "", unit_price: "", unit_label: "each" });
+
+  const { data: serviceItems = [], isLoading: serviceItemsLoading } = useQuery({
+    queryKey: ["my-service-items"],
+    queryFn: () => api.serviceItems.getMine(),
+    enabled: !!vendor,
+  });
+
+  const createItemMutation = useMutation({
+    mutationFn: (data: any) => api.serviceItems.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["my-service-items"] });
+      setShowAddItem(false);
+      setItemForm({ name: "", description: "", unit_price: "", unit_label: "each" });
+      toast.success("Service item added");
+    },
+    onError: (e: any) => toast.error(e.response?.data?.detail || "Failed to add item"),
+  });
+
+  const updateItemMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => api.serviceItems.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["my-service-items"] });
+      setEditingItem(null);
+      toast.success("Item updated");
+    },
+    onError: (e: any) => toast.error(e.response?.data?.detail || "Failed to update item"),
+  });
+
+  const deleteItemMutation = useMutation({
+    mutationFn: (id: number) => api.serviceItems.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["my-service-items"] });
+      toast.success("Item removed");
+    },
+    onError: (e: any) => toast.error(e.response?.data?.detail || "Failed to delete item"),
+  });
+
+  const handleItemSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const price = parseFloat(itemForm.unit_price);
+    if (!itemForm.name.trim() || isNaN(price) || price <= 0) {
+      toast.error("Please enter a valid name and price");
+      return;
+    }
+    const payload = {
+      name: itemForm.name.trim(),
+      description: itemForm.description.trim() || undefined,
+      unit_price: price,
+      unit_label: itemForm.unit_label,
+    };
+    if (editingItem) {
+      updateItemMutation.mutate({ id: editingItem.id, data: payload });
+    } else {
+      createItemMutation.mutate(payload);
+    }
+  };
+
+  const startEdit = (item: any) => {
+    setEditingItem(item);
+    setItemForm({
+      name: item.name,
+      description: item.description || "",
+      unit_price: String(item.unit_price),
+      unit_label: item.unit_label,
+    });
+    setShowAddItem(true);
+  };
+
+  const cancelItemForm = () => {
+    setShowAddItem(false);
+    setEditingItem(null);
+    setItemForm({ name: "", description: "", unit_price: "", unit_label: "each" });
+  };
 
   const handleLogout = () => {
     logout();
@@ -284,7 +363,7 @@ const VendorProfile = () => {
                         {ratingData?.total_reviews > 0 && ` (${ratingData.total_reviews} reviews)`}
                       </span>
                       <span className="flex items-center gap-1.5">
-                        <DollarSign className="h-3.5 w-3.5" /> From ₦{Number(vendor.starting_price).toLocaleString()}
+                        <Banknote className="h-3.5 w-3.5" /> From ₦{Number(vendor.starting_price).toLocaleString()}
                       </span>
                     </div>
                   </div>
@@ -351,7 +430,7 @@ const VendorProfile = () => {
                       <div>
                         <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5 block">Starting Price (₦)</label>
                         <div className="relative">
-                          <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Banknote className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                           <Input name="starting_price" type="number" defaultValue={vendor.starting_price} placeholder="50000" className="pl-9 text-sm h-10" />
                         </div>
                       </div>
@@ -486,11 +565,160 @@ const VendorProfile = () => {
                   )}
                 </div>
 
+                {/* Service Items */}
+                <div className="bg-white border border-border rounded-2xl p-6 lg:col-span-2">
+                  <div className="flex items-center justify-between mb-5">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-accent/10 rounded-lg flex items-center justify-center">
+                        <Package className="h-4 w-4 text-accent" />
+                      </div>
+                      <div>
+                        <h2 className="text-base font-bold text-foreground">Service Items & Pricing</h2>
+                        <p className="text-xs text-muted-foreground">Define what you offer and how you charge for it</p>
+                      </div>
+                    </div>
+                    {!showAddItem && (
+                      <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={() => setShowAddItem(true)}>
+                        <Plus className="h-3.5 w-3.5" /> Add Item
+                      </Button>
+                    )}
+                  </div>
+
+                  {/* Add/Edit form */}
+                  {showAddItem && (
+                    <form onSubmit={handleItemSubmit} className="mb-5 p-4 bg-muted/40 rounded-xl border border-border space-y-3">
+                      <p className="text-sm font-semibold">{editingItem ? "Edit Item" : "New Service Item"}</p>
+                      <div className="grid sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs font-medium text-muted-foreground mb-1 block">Item Name *</label>
+                          <Input
+                            placeholder="e.g. Mocktails"
+                            value={itemForm.name}
+                            onChange={(e) => setItemForm((f) => ({ ...f, name: e.target.value }))}
+                            className="h-9 text-sm"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-muted-foreground mb-1 block">Unit Label *</label>
+                          <select
+                            value={itemForm.unit_label}
+                            onChange={(e) => setItemForm((f) => ({ ...f, unit_label: e.target.value }))}
+                            className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            {["each", "per head", "per plate", "per table", "per hour", "per day", "flat rate"].map((l) => (
+                              <option key={l} value={l}>{l}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-muted-foreground mb-1 block">Price (₦) *</label>
+                          <Input
+                            type="number"
+                            min="1"
+                            step="0.01"
+                            placeholder="5000"
+                            value={itemForm.unit_price}
+                            onChange={(e) => setItemForm((f) => ({ ...f, unit_price: e.target.value }))}
+                            className="h-9 text-sm"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-muted-foreground mb-1 block">Description (optional)</label>
+                          <Input
+                            placeholder="Brief description"
+                            value={itemForm.description}
+                            onChange={(e) => setItemForm((f) => ({ ...f, description: e.target.value }))}
+                            className="h-9 text-sm"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2 justify-end">
+                        <Button type="button" variant="ghost" size="sm" onClick={cancelItemForm} className="text-xs">Cancel</Button>
+                        <Button
+                          type="submit"
+                          size="sm"
+                          className="text-xs"
+                          disabled={createItemMutation.isPending || updateItemMutation.isPending}
+                        >
+                          {(createItemMutation.isPending || updateItemMutation.isPending)
+                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            : editingItem ? "Save Changes" : "Add Item"}
+                        </Button>
+                      </div>
+                    </form>
+                  )}
+
+                  {/* Items list */}
+                  {serviceItemsLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : serviceItems.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground border-2 border-dashed border-border rounded-xl">
+                      <Package className="h-8 w-8 mx-auto mb-2 text-muted-foreground/30" />
+                      <p className="text-sm font-medium">No service items yet</p>
+                      <p className="text-xs mt-1">Add items so customers can select exactly what they need.</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-border border border-border rounded-xl overflow-hidden">
+                      {(serviceItems as any[]).map((item: any) => (
+                        <div key={item.id} className="flex items-center justify-between px-4 py-3 bg-white hover:bg-muted/20 transition-colors">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-medium text-foreground truncate">{item.name}</p>
+                              {!item.is_active && (
+                                <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">hidden</span>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              ₦{Number(item.unit_price).toLocaleString()} / {item.unit_label}
+                              {item.description && ` · ${item.description}`}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1 ml-3 flex-shrink-0">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                              title={item.is_active ? "Hide from customers" : "Show to customers"}
+                              onClick={() => updateItemMutation.mutate({ id: item.id, data: { is_active: !item.is_active } })}
+                            >
+                              {item.is_active ? <ToggleRight className="h-4 w-4 text-green-600" /> : <ToggleLeft className="h-4 w-4" />}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                              onClick={() => startEdit(item)}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                              onClick={() => deleteItemMutation.mutate(item.id)}
+                              disabled={deleteItemMutation.isPending}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 {/* Payout Settings */}
                 <div className="bg-white border border-border rounded-2xl p-6 lg:col-span-2">
                   <div className="flex items-center gap-2 mb-5">
                     <div className="w-8 h-8 bg-secondary/20 rounded-lg flex items-center justify-center">
-                      <DollarSign className="h-4 w-4 text-secondary-foreground" />
+                      <Banknote className="h-4 w-4 text-secondary-foreground" />
                     </div>
                     <div>
                       <h2 className="text-base font-bold text-foreground">Payout Settings</h2>

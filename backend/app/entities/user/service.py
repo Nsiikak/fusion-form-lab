@@ -33,7 +33,7 @@ class UserService:
             hashed_password=hashed_password,
             full_name=user_data.full_name,
             phone_number=user_data.phone_number,
-            role=user_data.role or UserRole.CUSTOMER
+            role=UserRole.CUSTOMER,  # role is never client-controlled at registration
         )
         
         db.add(db_user)

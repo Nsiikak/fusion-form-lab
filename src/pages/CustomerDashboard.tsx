@@ -5,7 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, MapPin, Star, Clock, CheckCircle2, Package, LogOut, Loader2, CreditCard, ChevronRight, Utensils, Palette, Camera, Music, Truck, Building2, Store } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Calendar, MapPin, Star, Clock, CheckCircle2, Package, LogOut, Loader2, CreditCard, ChevronRight, Utensils, Palette, Camera, Music, Truck, Building2, Store, Info } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api";
@@ -94,6 +100,9 @@ const CustomerDashboard = () => {
   const queryClient = useQueryClient();
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
+  const [bookingDetailOpen, setBookingDetailOpen] = useState(false);
+  const [detailBooking, setDetailBooking] = useState<any>(null);
+  const [detailEvent, setDetailEvent] = useState<any>(null);
 
   const handleLogout = () => {
     logout();
@@ -124,14 +133,25 @@ const CustomerDashboard = () => {
     },
   });
 
-  // Filter upcoming events (date >= today)
+  // Upcoming events = date >= today, not cancelled, AND has at least one confirmed/active booking
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const upcomingEvents = events.filter((e: any) => {
     const eventDate = new Date(e.date);
     eventDate.setHours(0, 0, 0, 0);
-    return eventDate >= today && e.status !== "cancelled";
+    if (!(eventDate >= today && e.status !== "cancelled")) return false;
+    return bookings.some(
+      (b: any) => b.event_id === e.id && ["confirmed", "completed"].includes(b.status)
+    );
   });
+
+  const getEventName = (eventId: number) => {
+    const event = events.find((e: any) => e.id === eventId);
+    return event?.name || null;
+  };
+
+  const bookingRef = (id: number) =>
+    `PLG-${new Date().getFullYear()}-${String(id).padStart(4, "0")}`;
 
   // Format date helper
   const formatDate = (dateString: string) => {
@@ -215,12 +235,12 @@ const CustomerDashboard = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground mb-1">Confirmed</p>
-                  <p className="text-3xl font-bold text-secondary">
+                  <p className="text-3xl font-bold text-green-600">
                     {statsLoading ? "..." : (stats?.confirmed_bookings || 0)}
                   </p>
                 </div>
-                <div className="w-12 h-12 bg-secondary/10 rounded-2xl flex items-center justify-center">
-                  <CheckCircle2 className="h-6 w-6 text-secondary" />
+                <div className="w-12 h-12 bg-green-500/10 rounded-2xl flex items-center justify-center">
+                  <CheckCircle2 className="h-6 w-6 text-green-600" />
                 </div>
               </div>
             </Card>
@@ -276,9 +296,9 @@ const CustomerDashboard = () => {
               ) : (
                 <div className="grid gap-6">
                   {upcomingEvents.map((event: any) => {
-                    // Count bookings for this event
-                    const eventBookings = bookings.filter((b: any) => b.event_id === event.id);
-                    const confirmedEventBookings = eventBookings.filter((b: any) => b.status === "confirmed");
+                    const confirmedEventBookings = bookings.filter(
+                      (b: any) => b.event_id === event.id && ["confirmed", "completed"].includes(b.status)
+                    );
                     const totalCost = confirmedEventBookings.reduce((sum: number, b: any) => sum + Number(b.price), 0);
 
                     return (
@@ -315,7 +335,11 @@ const CustomerDashboard = () => {
                                 ₦{totalCost.toLocaleString()}
                               </p>
                             </div>
-                            <Button variant="outline" className="border-primary/20 hover:bg-primary/5">
+                            <Button
+                              variant="outline"
+                              className="border-primary/20 hover:bg-primary/5"
+                              onClick={() => setDetailEvent({ event, confirmedEventBookings, totalCost })}
+                            >
                               View Details
                               <ChevronRight className="ml-1 h-4 w-4" />
                             </Button>
@@ -353,17 +377,27 @@ const CustomerDashboard = () => {
                       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                         <div className="space-y-3">
                           <div className="flex items-center gap-3 flex-wrap">
-                            <h3 className="text-lg font-bold">{booking.vendor_name || `Vendor #${booking.vendor_id}`}</h3>
+                            <h3 className="text-lg font-bold">{booking.vendor_name}</h3>
+                            <span className="text-xs font-mono text-muted-foreground">{bookingRef(booking.id)}</span>
                             {booking.vendor_category && (
                               <Badge variant="secondary" className="bg-secondary/10 text-secondary-foreground hover:bg-secondary/20">{booking.vendor_category}</Badge>
                             )}
                             <Badge
                               className={`${booking.status === "confirmed" ? "bg-green-500/10 text-green-700 hover:bg-green-500/20" :
                                 booking.status === "pending" ? "bg-orange-500/10 text-orange-700 hover:bg-orange-500/20" :
+                                booking.status === "awaiting_confirmation" ? "bg-purple-500/10 text-purple-700 hover:bg-purple-500/20" :
+                                booking.status === "completed" ? "bg-blue-500/10 text-blue-700 hover:bg-blue-500/20" :
                                   "bg-gray-100 text-gray-700 hover:bg-gray-200"
                                 }`}
                             >
-                              {booking.status}
+                              {{
+                                pending: "Pending",
+                                confirmed: "Confirmed",
+                                awaiting_confirmation: "Awaiting Your Confirmation",
+                                completed: "Completed",
+                                declined: "Declined",
+                                cancelled: "Cancelled",
+                              }[booking.status] ?? booking.status}
                             </Badge>
                           </div>
 
@@ -375,7 +409,7 @@ const CustomerDashboard = () => {
                             {booking.event_id && (
                               <div className="flex items-center gap-2">
                                 <Package className="h-4 w-4 text-primary" />
-                                Event ID: {booking.event_id}
+                                {getEventName(booking.event_id) || `Booking #${booking.id}`}
                               </div>
                             )}
                           </div>
@@ -406,29 +440,44 @@ const CustomerDashboard = () => {
                               </Button>
 
                             )}
-                            {booking.status === "confirmed" && (
-                              <Button
-                                size="sm"
-                                className="bg-green-600 hover:bg-green-700 text-white shadow-md"
-                                onClick={async () => {
-                                  try {
-                                    await api.bookings.updateStatus(booking.id, "completed");
-                                    toast.success("Booking marked as completed!");
-                                    queryClient.invalidateQueries({ queryKey: ["bookings"] });
-                                    // Open review modal immediately after completion
-                                    setSelectedBooking(booking);
-                                    setIsReviewModalOpen(true);
-                                  } catch (error) {
-                                    toast.error("Failed to update status");
-                                  }
-                                }}
-                              >
-                                <CheckCircle2 className="h-4 w-4 mr-1" />
-                                Confirm Completion
-                              </Button>
-                            )}
+                            {booking.status === "awaiting_confirmation" && (() => {
+                              const confirmedAt = booking.vendor_confirmed_at
+                                ? new Date(booking.vendor_confirmed_at)
+                                : null;
+                              const autoReleaseAt = confirmedAt
+                                ? new Date(confirmedAt.getTime() + 24 * 60 * 60 * 1000)
+                                : null;
+                              const hoursLeft = autoReleaseAt
+                                ? Math.max(0, Math.ceil((autoReleaseAt.getTime() - Date.now()) / 3_600_000))
+                                : null;
+                              return (
+                                <div className="flex flex-col gap-1.5">
+                                  <Button
+                                    size="sm"
+                                    className="bg-purple-600 hover:bg-purple-700 text-white shadow-md"
+                                    onClick={async () => {
+                                      try {
+                                        await api.bookings.updateStatus(booking.id, "completed");
+                                        toast.success("Payment released to vendor. Thank you!");
+                                        queryClient.invalidateQueries({ queryKey: ["bookings"] });
+                                      } catch (error) {
+                                        toast.error("Failed to confirm");
+                                      }
+                                    }}
+                                  >
+                                    <CheckCircle2 className="h-4 w-4 mr-1" />
+                                    Confirm &amp; Release Payment
+                                  </Button>
+                                  {hoursLeft !== null && (
+                                    <p className="text-xs text-muted-foreground text-center">
+                                      Auto-releases in ~{hoursLeft}h
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            })()}
 
-                            {booking.status === "completed" && (
+                            {booking.status === "completed" && !booking.has_review && (
                               <Button
                                 size="sm"
                                 className="bg-yellow-500 hover:bg-yellow-600 text-white"
@@ -438,10 +487,25 @@ const CustomerDashboard = () => {
                                 }}
                               >
                                 <Star className="h-4 w-4 mr-1" />
-                                Rate Provider
+                                Rate Vendor
                               </Button>
                             )}
-                            <Button size="sm" className="shadow-md" onClick={() => navigate(`/vendors/${booking.vendor_id}`)}>View Details</Button>
+
+                            {booking.status === "completed" && booking.has_review && (
+                              <span className="flex items-center gap-1 text-sm font-medium text-green-600">
+                                <CheckCircle2 className="h-4 w-4" />
+                                Reviewed
+                              </span>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-primary/20 hover:bg-primary/5"
+                              onClick={() => { setDetailBooking(booking); setBookingDetailOpen(true); }}
+                            >
+                              <Info className="h-4 w-4 mr-1" />
+                              Details
+                            </Button>
                           </div>
                         </div>
                       </div>
@@ -466,15 +530,169 @@ const CustomerDashboard = () => {
               }}
               onReviewSubmitted={() => {
                 queryClient.invalidateQueries({ queryKey: ["bookings"] });
-                // Also invalidate reviews if we had them here, but mostly bookings history update (maybe add 'Reviewed' badge later?)
-                // For now just close.
+                queryClient.invalidateQueries({ queryKey: ["vendor-reviews", String(selectedBooking.vendor_id)] });
               }}
             />
           )}
+
+          {/* Booking Detail Modal */}
+          <Dialog open={bookingDetailOpen} onOpenChange={setBookingDetailOpen}>
+            <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Booking Details</DialogTitle>
+              </DialogHeader>
+              {detailBooking && (
+                <div className="space-y-4 pt-2">
+                  {/* Reference & status row */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Reference</p>
+                      <p className="text-sm font-bold font-mono tracking-wider">{bookingRef(detailBooking.id)}</p>
+                    </div>
+                    <Badge className={
+                      detailBooking.status === "confirmed" ? "bg-green-500/10 text-green-700" :
+                      detailBooking.status === "completed" ? "bg-blue-500/10 text-blue-700" :
+                      detailBooking.status === "pending" ? "bg-orange-500/10 text-orange-700" :
+                      "bg-gray-100 text-gray-700"
+                    }>
+                      {detailBooking.status}
+                    </Badge>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="text-muted-foreground">Vendor</div>
+                    <div className="font-medium">{detailBooking.vendor_name}</div>
+
+                    {detailBooking.vendor_category && (
+                      <>
+                        <div className="text-muted-foreground">Category</div>
+                        <div className="font-medium capitalize">{detailBooking.vendor_category}</div>
+                      </>
+                    )}
+
+                    {detailBooking.event_id && (
+                      <>
+                        <div className="text-muted-foreground">Event</div>
+                        <div className="font-medium">{getEventName(detailBooking.event_id) || "—"}</div>
+                      </>
+                    )}
+
+                    <div className="text-muted-foreground">Event Date</div>
+                    <div className="font-medium">{formatDate(detailBooking.event_date)}</div>
+
+                    <div className="text-muted-foreground">Payment</div>
+                    <div className="flex items-center gap-1 font-medium text-green-700">
+                      <CheckCircle2 className="h-3.5 w-3.5" /> Paid
+                    </div>
+
+                    <div className="text-muted-foreground">Total Paid</div>
+                    <div className="font-bold text-primary">₦{Number(detailBooking.price).toLocaleString()}</div>
+                  </div>
+
+                  {/* Service items breakdown */}
+                  {detailBooking.service_items_snapshot && detailBooking.service_items_snapshot.length > 0 && (
+                    <div className="border border-border rounded-lg overflow-hidden">
+                      <div className="px-3 py-2 bg-muted/50 border-b border-border">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Services Ordered</p>
+                      </div>
+                      <div className="divide-y divide-border">
+                        {detailBooking.service_items_snapshot.map((s: any, i: number) => (
+                          <div key={i} className="flex justify-between items-center px-3 py-2 text-sm">
+                            <span className="text-foreground">
+                              {s.name} <span className="text-muted-foreground">× {s.quantity}</span>
+                            </span>
+                            <span className="font-medium">₦{Number(s.subtotal).toLocaleString()}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {detailBooking.notes && (
+                    <div className="text-sm">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Notes</p>
+                      <p className="text-foreground bg-muted/30 rounded-lg px-3 py-2">{detailBooking.notes}</p>
+                    </div>
+                  )}
+
+                  <div className="pt-2 border-t flex gap-2">
+                    <Link to={`/vendors/${detailBooking.vendor_id}`} className="flex-1">
+                      <Button variant="outline" className="w-full" onClick={() => setBookingDetailOpen(false)}>
+                        View Vendor
+                      </Button>
+                    </Link>
+                    <Button className="flex-1" onClick={() => setBookingDetailOpen(false)}>Close</Button>
+                  </div>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
         </div>
       </section >
 
+      {/* Event Detail Modal */}
+      <Dialog open={!!detailEvent} onOpenChange={(open) => !open && setDetailEvent(null)}>
+        <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Event Summary</DialogTitle>
+          </DialogHeader>
+          {detailEvent && (
+            <div className="space-y-4 pt-2">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="text-muted-foreground">Event</div>
+                <div className="font-bold">{detailEvent.event.name}</div>
 
+                <div className="text-muted-foreground">Date</div>
+                <div className="font-medium">{formatDate(detailEvent.event.date)}</div>
+
+                <div className="text-muted-foreground">Location</div>
+                <div className="font-medium">{detailEvent.event.location}</div>
+
+                <div className="text-muted-foreground">Confirmed Vendors</div>
+                <div className="font-medium">{detailEvent.confirmedEventBookings.length}</div>
+
+                <div className="text-muted-foreground">Total Paid</div>
+                <div className="font-bold text-primary">₦{Number(detailEvent.totalCost).toLocaleString()}</div>
+              </div>
+
+              {detailEvent.confirmedEventBookings.length > 0 && (
+                <div className="border border-border rounded-lg overflow-hidden">
+                  <div className="px-3 py-2 bg-muted/50 border-b border-border">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Confirmed Bookings</p>
+                  </div>
+                  <div className="divide-y divide-border">
+                    {detailEvent.confirmedEventBookings.map((b: any) => (
+                      <div key={b.id} className="flex items-center justify-between px-3 py-2.5 text-sm">
+                        <div>
+                          <p className="font-medium">{b.vendor_name}</p>
+                          <p className="text-xs text-muted-foreground capitalize">{b.vendor_category} · {bookingRef(b.id)}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold">₦{Number(b.price).toLocaleString()}</p>
+                          <Badge className="text-[10px] bg-green-500/10 text-green-700 px-1.5 py-0">
+                            {b.status}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {detailEvent.event.description && (
+                <div className="text-sm">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Description</p>
+                  <p className="bg-muted/30 rounded-lg px-3 py-2">{detailEvent.event.description}</p>
+                </div>
+              )}
+
+              <div className="pt-2 border-t">
+                <Button className="w-full" onClick={() => setDetailEvent(null)}>Close</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div >
   );
 };

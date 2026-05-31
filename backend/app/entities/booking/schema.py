@@ -1,19 +1,35 @@
-from pydantic import BaseModel
-from typing import Optional
-from datetime import datetime, time
+from pydantic import BaseModel, Field, field_validator
+from typing import Optional, List, Any
+from datetime import datetime, time, timezone
 from decimal import Decimal
 from app.entities.booking.model import BookingStatus
+
+
+class ServiceItemOrder(BaseModel):
+    service_item_id: int
+    quantity: int = Field(..., ge=1, le=10000)
 
 class BookingBase(BaseModel):
     vendor_id: int
     event_id: Optional[int] = None
-    price: Decimal
+    price: Decimal = Field(..., gt=0, description="Must be greater than zero")
     event_date: datetime
     event_time: Optional[time] = None
-    notes: Optional[str] = None
+    notes: Optional[str] = Field(None, max_length=2000)
+
+    @field_validator("event_date")
+    @classmethod
+    def event_date_must_be_future(cls, v: datetime) -> datetime:
+        now = datetime.now(timezone.utc)
+        if v.tzinfo is None:
+            v = v.replace(tzinfo=timezone.utc)
+        if v <= now:
+            raise ValueError("Event date must be in the future")
+        return v
 
 class BookingCreate(BookingBase):
     payment_reference: Optional[str] = None
+    service_items: Optional[List[ServiceItemOrder]] = None
 
 class BookingUpdate(BaseModel):
     status: Optional[BookingStatus] = None
@@ -39,4 +55,5 @@ class BookingWithDetails(BookingResponse):
     vendor_category: Optional[str] = None
     customer_name: Optional[str] = None
     customer_email: Optional[str] = None
+    service_items_snapshot: Optional[Any] = None
 

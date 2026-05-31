@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum, ForeignKey, Text, Numeric, JSON
-from sqlalchemy.sql import func
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum, ForeignKey, Index, Text, Numeric, JSON
+from sqlalchemy.dialects.postgresql import TSVECTOR
+from sqlalchemy.sql import func, text
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 import enum
@@ -24,6 +25,17 @@ class VerificationStatus(str, enum.Enum):
 
 class Vendor(Base):
     __tablename__ = "vendors"
+    __table_args__ = (
+        Index("ix_vendors_user_id", "user_id"),
+        Index("ix_vendors_category", "category"),
+        Index("ix_vendors_verification_status", "verification_status"),
+        Index("ix_vendors_is_active", "is_active"),
+        Index(
+            "ix_vendors_business_name_gin",
+            text("to_tsvector('english', business_name)"),
+            postgresql_using="gin",
+        ),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)

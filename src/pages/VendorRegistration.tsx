@@ -23,13 +23,27 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Footer } from "@/components/Footer";
-import { CheckCircle2, Upload, ArrowRight, Building2, User, Mail, Phone, MapPin, DollarSign, FileText } from "lucide-react";
+import {
+  CheckCircle2,
+  Upload,
+  ArrowRight,
+  Building2,
+  User,
+  Mail,
+  Phone,
+  MapPin,
+  Banknote,
+  FileText,
+  Briefcase,
+  Shield,
+  Check,
+  X,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 
-// Step 1 schema
 const step1Schema = z.object({
   business_name: z.string().min(1, "Business name is required"),
   contact_name: z.string().min(1, "Contact name is required"),
@@ -39,7 +53,6 @@ const step1Schema = z.object({
   location: z.string().min(1, "Location is required"),
 });
 
-// Step 2 schema
 const step2Schema = z.object({
   description: z.string().min(10, "Description must be at least 10 characters"),
   starting_price: z.string().min(1, "Starting price is required").refine(
@@ -49,10 +62,14 @@ const step2Schema = z.object({
   business_size: z.enum(["small", "medium", "large"]),
 });
 
-// Step 3 schema
 const step3Schema = z.object({
   registration_number: z.string().min(1, "RC number is required for automatic verification"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: z
+    .string()
+    .min(8, "At least 8 characters")
+    .regex(/[A-Za-z]/, "Must include at least one letter")
+    .regex(/[0-9]/, "Must include at least one number")
+    .regex(/[^A-Za-z0-9]/, "Must include at least one special character"),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
@@ -62,6 +79,57 @@ const step3Schema = z.object({
 type Step1FormValues = z.infer<typeof step1Schema>;
 type Step2FormValues = z.infer<typeof step2Schema>;
 type Step3FormValues = z.infer<typeof step3Schema>;
+
+const CATEGORIES = [
+  { value: "catering", label: "Catering" },
+  { value: "decoration", label: "Decoration" },
+  { value: "photography", label: "Photography" },
+  { value: "entertainment", label: "Entertainment" },
+  { value: "logistics", label: "Logistics" },
+  { value: "venue", label: "Venue" },
+];
+
+const SectionDivider = ({ label }: { label: string }) => (
+  <div className="flex items-center gap-3 my-2">
+    <div className="h-px flex-1 bg-border" />
+    <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest px-1">
+      {label}
+    </span>
+    <div className="h-px flex-1 bg-border" />
+  </div>
+);
+
+const StepHeader = ({
+  step,
+  icon: Icon,
+  title,
+  subtitle,
+}: {
+  step: number;
+  icon: React.ElementType;
+  title: string;
+  subtitle: string;
+}) => (
+  <div className="flex items-center gap-4 mb-8 p-5 bg-gradient-to-r from-primary/10 to-accent/5 rounded-2xl border border-primary/10">
+    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-[hsl(var(--primary-glow))] flex items-center justify-center shadow-lg flex-shrink-0">
+      <Icon className="h-7 w-7 text-white" />
+    </div>
+    <div>
+      <p className="text-[11px] font-bold text-primary uppercase tracking-widest mb-0.5">
+        Step {step} of 3
+      </p>
+      <h2 className="text-xl font-bold text-foreground leading-tight">{title}</h2>
+      <p className="text-sm text-muted-foreground mt-0.5">{subtitle}</p>
+    </div>
+  </div>
+);
+
+const PwCheck = ({ met, label }: { met: boolean; label: string }) => (
+  <span className={`flex items-center gap-1.5 text-xs ${met ? "text-green-600" : "text-muted-foreground"}`}>
+    {met ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5 opacity-40" />}
+    {label}
+  </span>
+);
 
 const VendorRegistration = () => {
   const navigate = useNavigate();
@@ -105,6 +173,14 @@ const VendorRegistration = () => {
       confirmPassword: "",
     },
   });
+
+  const passwordValue = step3Form.watch("password") ?? "";
+  const pwChecks = {
+    length: passwordValue.length >= 8,
+    letter: /[A-Za-z]/.test(passwordValue),
+    number: /[0-9]/.test(passwordValue),
+    special: /[^A-Za-z0-9]/.test(passwordValue),
+  };
 
   const handleStep1Next = (data: Step1FormValues) => {
     setFormData({ ...formData, step1: data });
@@ -152,7 +228,6 @@ const VendorRegistration = () => {
 
       await refreshUser();
 
-      // Upload selected service photos after registration
       if (selectedPhotos.length > 0) {
         try {
           for (const photo of selectedPhotos) {
@@ -182,112 +257,75 @@ const VendorRegistration = () => {
               <img src="/Plagohive.svg" alt="Plagohive" className="h-12 w-auto object-contain" />
             </Link>
             <Link to="/vendor-search">
-              <Button variant="outline" className="border-primary/20 hover:bg-primary/5 hover:text-primary transition-colors">Back to Search</Button>
+              <Button variant="outline" className="border-primary/20 hover:bg-primary/5 hover:text-primary transition-colors">
+                Back to Search
+              </Button>
             </Link>
           </div>
         </div>
       </header>
 
       <section className="pt-32 pb-16 relative overflow-hidden">
-        {/* Decorative elements */}
         <div className="absolute top-20 left-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-20 right-0 w-96 h-96 bg-accent/5 rounded-full blur-3xl pointer-events-none" />
 
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl relative z-10">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-3xl relative z-10">
           {/* Progress Steps */}
-          <div className="mb-12">
-            <div className="flex items-center justify-between mb-4 relative">
+          <div className="mb-10">
+            <div className="flex items-center justify-between mb-3 relative">
               {[1, 2, 3].map((s) => (
                 <div key={s} className="flex items-center flex-1 z-10">
-                  <div className={`flex items-center justify-center w-12 h-12 rounded-full font-bold shadow-lg transition-all duration-300 ${step >= s ? 'bg-gradient-to-br from-primary to-primary-glow text-white scale-110' : 'bg-muted text-muted-foreground'
-                    }`}>
-                    {step > s ? <CheckCircle2 className="h-6 w-6" /> : s}
+                  <div
+                    className={`flex items-center justify-center w-11 h-11 rounded-full font-bold shadow-md transition-all duration-300 ${
+                      step >= s
+                        ? "bg-gradient-to-br from-primary to-[hsl(var(--primary-glow))] text-white scale-110"
+                        : "bg-muted text-muted-foreground"
+                    }`}
+                  >
+                    {step > s ? <CheckCircle2 className="h-5 w-5" /> : s}
                   </div>
                   {s < 3 && (
-                    <div className={`flex-1 h-1 mx-4 rounded-full transition-all duration-500 ${step > s ? 'bg-gradient-to-r from-primary to-primary-glow' : 'bg-muted'
-                      }`} />
+                    <div
+                      className={`flex-1 h-1 mx-3 rounded-full transition-all duration-500 ${
+                        step > s ? "bg-gradient-to-r from-primary to-[hsl(var(--primary-glow))]" : "bg-muted"
+                      }`}
+                    />
                   )}
                 </div>
               ))}
             </div>
-            <div className="flex justify-between text-sm font-medium">
+            <div className="flex justify-between text-xs font-semibold">
               <span className={step >= 1 ? "text-primary" : "text-muted-foreground"}>Basic Info</span>
               <span className={step >= 2 ? "text-primary" : "text-muted-foreground"}>Service Details</span>
               <span className={step >= 3 ? "text-primary" : "text-muted-foreground"}>Verification</span>
             </div>
           </div>
 
-          <Card className="glass-panel p-8 md:p-12 animate-fade-in-up">
+          <Card className="glass-panel p-6 md:p-10 animate-fade-in-up">
+            {/* ── STEP 1 ── */}
             {step === 1 && (
               <Form {...step1Form}>
-                <form onSubmit={step1Form.handleSubmit(handleStep1Next)} className="space-y-8">
-                  <div className="text-center mb-8">
-                    <h2 className="text-3xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-primary to-accent">Vendor Registration</h2>
-                    <p className="text-muted-foreground">Let's get started with your basic information</p>
-                  </div>
+                <form onSubmit={step1Form.handleSubmit(handleStep1Next)} className="space-y-6">
+                  <StepHeader
+                    step={1}
+                    icon={Building2}
+                    title="Business Information"
+                    subtitle="Tell us about your business and how customers can reach you"
+                  />
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <SectionDivider label="Business Identity" />
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <FormField
                       control={step1Form.control}
                       name="business_name"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Business Name *</FormLabel>
+                          <FormLabel>Business Name <span className="text-destructive">*</span></FormLabel>
                           <FormControl>
                             <div className="relative">
-                              <Building2 className="absolute left-3 top-3.5 h-5 w-5 text-muted-foreground" />
-                              <Input placeholder="Enter your business name" className="pl-10 h-12 glass-input" {...field} />
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={step1Form.control}
-                      name="contact_name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Contact Name *</FormLabel>
-                          <FormControl>
-                            <div className="relative">
-                              <User className="absolute left-3 top-3.5 h-5 w-5 text-muted-foreground" />
-                              <Input placeholder="Your full name" className="pl-10 h-12 glass-input" {...field} />
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={step1Form.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email Address *</FormLabel>
-                          <FormControl>
-                            <div className="relative">
-                              <Mail className="absolute left-3 top-3.5 h-5 w-5 text-muted-foreground" />
-                              <Input type="email" placeholder="your@email.com" className="pl-10 h-12 glass-input" {...field} />
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={step1Form.control}
-                      name="phone_number"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Phone Number *</FormLabel>
-                          <FormControl>
-                            <div className="relative">
-                              <Phone className="absolute left-3 top-3.5 h-5 w-5 text-muted-foreground" />
-                              <Input type="tel" placeholder="+234 XXX XXX XXXX" className="pl-10 h-12 glass-input" {...field} />
+                              <Building2 className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
+                              <Input placeholder="e.g. Bright Events Catering" className="pl-10 h-11 glass-input" {...field} />
                             </div>
                           </FormControl>
                           <FormMessage />
@@ -300,22 +338,76 @@ const VendorRegistration = () => {
                       name="category"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Business Category *</FormLabel>
+                          <FormLabel>Business Category <span className="text-destructive">*</span></FormLabel>
                           <Select onValueChange={field.onChange} defaultValue={field.value}>
                             <FormControl>
-                              <SelectTrigger className="glass-input h-12">
+                              <SelectTrigger className="glass-input h-11">
                                 <SelectValue placeholder="Select category" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="catering">Catering</SelectItem>
-                              <SelectItem value="decoration">Decoration</SelectItem>
-                              <SelectItem value="photography">Photography</SelectItem>
-                              <SelectItem value="entertainment">Entertainment</SelectItem>
-                              <SelectItem value="logistics">Logistics</SelectItem>
-                              <SelectItem value="venue">Venue</SelectItem>
+                              {CATEGORIES.map((c) => (
+                                <SelectItem key={c.value} value={c.value}>
+                                  {c.label}
+                                </SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <SectionDivider label="Contact Information" />
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <FormField
+                      control={step1Form.control}
+                      name="contact_name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Contact Person <span className="text-destructive">*</span></FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <User className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
+                              <Input placeholder="Your full name" className="pl-10 h-11 glass-input" {...field} />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={step1Form.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Email Address <span className="text-destructive">*</span></FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <Mail className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
+                              <Input type="email" placeholder="your@email.com" className="pl-10 h-11 glass-input" {...field} />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={step1Form.control}
+                      name="phone_number"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Phone Number <span className="text-destructive">*</span></FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <Phone className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
+                              <Input type="tel" placeholder="+234 XXX XXX XXXX" className="pl-10 h-11 glass-input" {...field} />
+                            </div>
+                          </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -326,11 +418,11 @@ const VendorRegistration = () => {
                       name="location"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Location *</FormLabel>
+                          <FormLabel>Location <span className="text-destructive">*</span></FormLabel>
                           <FormControl>
                             <div className="relative">
-                              <MapPin className="absolute left-3 top-3.5 h-5 w-5 text-muted-foreground" />
-                              <Input placeholder="City, State" className="pl-10 h-12 glass-input" {...field} />
+                              <MapPin className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
+                              <Input placeholder="City, State (e.g. Lagos, Lagos)" className="pl-10 h-11 glass-input" {...field} />
                             </div>
                           </FormControl>
                           <FormMessage />
@@ -339,7 +431,7 @@ const VendorRegistration = () => {
                     />
                   </div>
 
-                  <div className="flex justify-end pt-4">
+                  <div className="flex justify-end pt-2">
                     <Button type="submit" size="lg" className="px-8 shadow-lg hover:shadow-primary/50 transition-all duration-300">
                       Continue
                       <ArrowRight className="ml-2 h-5 w-5" />
@@ -349,121 +441,141 @@ const VendorRegistration = () => {
               </Form>
             )}
 
+            {/* ── STEP 2 ── */}
             {step === 2 && (
               <Form {...step2Form}>
-                <form onSubmit={step2Form.handleSubmit(handleStep2Next)} className="space-y-8">
-                  <div className="text-center mb-8">
-                    <h2 className="text-3xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-primary to-accent">Service Details</h2>
-                    <p className="text-muted-foreground">Tell us about your services and pricing</p>
-                  </div>
+                <form onSubmit={step2Form.handleSubmit(handleStep2Next)} className="space-y-6">
+                  <StepHeader
+                    step={2}
+                    icon={Briefcase}
+                    title="Service Details"
+                    subtitle="Describe what you offer and how you price your services"
+                  />
 
-                  <div className="space-y-6">
+                  <SectionDivider label="What You Offer" />
+
+                  <FormField
+                    control={step2Form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Service Description <span className="text-destructive">*</span></FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Describe your services, your experience, and what makes you stand out from the competition..."
+                            rows={5}
+                            className="glass-input min-h-[120px] resize-none"
+                            {...field}
+                          />
+                        </FormControl>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          This appears on your public profile. Be specific — mention your specialties, years of experience, and typical event types.
+                        </p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <SectionDivider label="Pricing & Scale" />
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <FormField
                       control={step2Form.control}
-                      name="description"
+                      name="starting_price"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Service Description *</FormLabel>
+                          <FormLabel>Starting Price (₦) <span className="text-destructive">*</span></FormLabel>
                           <FormControl>
-                            <Textarea
-                              placeholder="Describe your services, what makes you unique..."
-                              rows={5}
-                              className="glass-input min-h-[120px]"
-                              {...field}
-                            />
+                            <div className="relative">
+                              <Banknote className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
+                              <Input type="number" placeholder="50000" className="pl-10 h-11 glass-input" {...field} />
+                            </div>
                           </FormControl>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Your minimum package price. You can add detailed service items later from your dashboard.
+                          </p>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <FormField
-                        control={step2Form.control}
-                        name="starting_price"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Starting Price (₦) *</FormLabel>
+                    <FormField
+                      control={step2Form.control}
+                      name="business_size"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Business Scale <span className="text-destructive">*</span></FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value}>
                             <FormControl>
-                              <div className="relative">
-                                <DollarSign className="absolute left-3 top-3.5 h-5 w-5 text-muted-foreground" />
-                                <Input type="number" placeholder="50000" className="pl-10 h-12 glass-input" {...field} />
-                              </div>
+                              <SelectTrigger className="glass-input h-11">
+                                <SelectValue placeholder="Select scale" />
+                              </SelectTrigger>
                             </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={step2Form.control}
-                        name="business_size"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Business Size *</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
-                              <FormControl>
-                                <SelectTrigger className="glass-input h-12">
-                                  <SelectValue placeholder="Select size" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="small">Small Scale</SelectItem>
-                                <SelectItem value="medium">Medium Scale</SelectItem>
-                                <SelectItem value="large">Large Scale</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Upload Service Photos <span className="text-muted-foreground font-normal">(optional, up to 5)</span></label>
-                      {selectedPhotos.length > 0 && (
-                        <div className="grid grid-cols-3 gap-2 mb-2">
-                          {selectedPhotos.map((file, i) => (
-                            <div key={i} className="relative group aspect-square">
-                              <img
-                                src={URL.createObjectURL(file)}
-                                alt=""
-                                className="w-full h-full object-cover rounded-lg"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => removeSelectedPhoto(i)}
-                                className="absolute top-1 right-1 bg-black/60 hover:bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-all"
-                              >
-                                <Upload className="h-3 w-3 rotate-45" />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
+                            <SelectContent>
+                              <SelectItem value="small">Small Scale (1–10 staff)</SelectItem>
+                              <SelectItem value="medium">Medium Scale (11–50 staff)</SelectItem>
+                              <SelectItem value="large">Large Scale (50+ staff)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
                       )}
-                      {selectedPhotos.length < 5 && (
-                        <label className="block border-2 border-dashed border-primary/20 bg-primary/5 rounded-xl p-6 text-center hover:border-primary/50 hover:bg-primary/10 transition-all cursor-pointer group">
-                          <Upload className="h-10 w-10 mx-auto mb-3 text-primary group-hover:scale-110 transition-transform" />
-                          <p className="text-sm font-medium text-foreground">
-                            Click to upload or drag and drop
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            PNG, JPG, WebP up to 5 MB each
-                          </p>
-                          <input
-                            ref={photoInputRef}
-                            type="file"
-                            accept="image/jpeg,image/png,image/webp"
-                            multiple
-                            className="hidden"
-                            onChange={handlePhotoSelect}
-                          />
-                        </label>
-                      )}
-                    </div>
+                    />
                   </div>
 
-                  <div className="flex justify-between pt-4">
+                  <SectionDivider label="Portfolio Photos" />
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm text-muted-foreground">
+                        Upload up to 5 photos showcasing your work <span className="text-xs">(optional)</span>
+                      </p>
+                      {selectedPhotos.length > 0 && (
+                        <span className="text-xs text-primary font-medium">
+                          {selectedPhotos.length} / 5 added
+                        </span>
+                      )}
+                    </div>
+
+                    {selectedPhotos.length > 0 && (
+                      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                        {selectedPhotos.map((file, i) => (
+                          <div key={i} className="relative group aspect-square">
+                            <img
+                              src={URL.createObjectURL(file)}
+                              alt=""
+                              className="w-full h-full object-cover rounded-xl border border-border"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => removeSelectedPhoto(i)}
+                              className="absolute top-1 right-1 bg-black/60 hover:bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-all"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {selectedPhotos.length < 5 && (
+                      <label className="block border-2 border-dashed border-primary/20 bg-primary/5 rounded-xl p-6 text-center hover:border-primary/40 hover:bg-primary/10 transition-all cursor-pointer group">
+                        <Upload className="h-9 w-9 mx-auto mb-2.5 text-primary/60 group-hover:text-primary group-hover:scale-110 transition-all" />
+                        <p className="text-sm font-medium text-foreground">Click to upload photos</p>
+                        <p className="text-xs text-muted-foreground mt-1">PNG, JPG, WebP — up to 5 MB each</p>
+                        <input
+                          ref={photoInputRef}
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          multiple
+                          className="hidden"
+                          onChange={handlePhotoSelect}
+                        />
+                      </label>
+                    )}
+                  </div>
+
+                  <div className="flex justify-between pt-2">
                     <Button onClick={() => setStep(1)} variant="outline" size="lg" className="border-primary/20 hover:bg-primary/5">
                       Back
                     </Button>
@@ -476,44 +588,76 @@ const VendorRegistration = () => {
               </Form>
             )}
 
+            {/* ── STEP 3 ── */}
             {step === 3 && (
               <Form {...step3Form}>
-                <form onSubmit={step3Form.handleSubmit(handleSubmit)} className="space-y-8">
-                  <div className="text-center mb-8">
-                    <h2 className="text-3xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-primary to-accent">Verification</h2>
-                    <p className="text-muted-foreground">Help us verify your business</p>
+                <form onSubmit={step3Form.handleSubmit(handleSubmit)} className="space-y-6">
+                  <StepHeader
+                    step={3}
+                    icon={Shield}
+                    title="Business Verification"
+                    subtitle="Verify your business and secure your account"
+                  />
+
+                  <SectionDivider label="CAC Verification" />
+
+                  <FormField
+                    control={step3Form.control}
+                    name="registration_number"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>
+                          CAC Registration Number (RC Number) <span className="text-destructive">*</span>
+                        </FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <FileText className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
+                            <Input placeholder="e.g. RC1234567" className="pl-10 h-11 glass-input" {...field} />
+                          </div>
+                        </FormControl>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Your RC number is automatically cross-checked with the CAC database. Matching businesses are approved instantly.
+                        </p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-xl p-5">
+                    <h3 className="font-semibold mb-3 flex items-center gap-2 text-green-700 text-sm">
+                      <CheckCircle2 className="h-4 w-4" />
+                      What happens after submission?
+                    </h3>
+                    <ul className="space-y-1.5 text-sm text-muted-foreground ml-6">
+                      <li>• Your RC number is checked against the CAC database automatically</li>
+                      <li>
+                        • If your business name matches, you're{" "}
+                        <span className="font-semibold text-green-700">approved instantly</span>
+                      </li>
+                      <li>• Mismatches are reviewed by our team within 48 hours</li>
+                      <li>• Verified vendors appear in search and can start receiving bookings</li>
+                    </ul>
                   </div>
 
-                  <div className="space-y-6">
-                    <FormField
-                      control={step3Form.control}
-                      name="registration_number"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>CAC Registration Number (RC Number) *</FormLabel>
-                          <FormControl>
-                            <div className="relative">
-                              <FileText className="absolute left-3 top-3.5 h-5 w-5 text-muted-foreground" />
-                              <Input placeholder="e.g. RC1234567" className="pl-10 h-12 glass-input" {...field} />
-                            </div>
-                          </FormControl>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Your CAC RC number is used to automatically verify your business. Verified vendors get approved instantly and are listed sooner.
-                          </p>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                  <SectionDivider label="Account Security" />
 
+                  <div className="space-y-5">
                     <FormField
                       control={step3Form.control}
                       name="password"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Create Password *</FormLabel>
+                          <FormLabel>Create Password <span className="text-destructive">*</span></FormLabel>
                           <FormControl>
-                            <Input type="password" placeholder="Enter password" className="h-12 glass-input" {...field} />
+                            <Input type="password" placeholder="Enter a strong password" className="h-11 glass-input" {...field} />
                           </FormControl>
+                          {/* Live requirements checklist */}
+                          <div className="grid grid-cols-2 gap-1.5 mt-2 p-3 bg-muted/50 rounded-lg border border-border">
+                            <PwCheck met={pwChecks.length} label="8+ characters" />
+                            <PwCheck met={pwChecks.letter} label="One letter" />
+                            <PwCheck met={pwChecks.number} label="One number" />
+                            <PwCheck met={pwChecks.special} label="One special character" />
+                          </div>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -524,47 +668,32 @@ const VendorRegistration = () => {
                       name="confirmPassword"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Confirm Password *</FormLabel>
+                          <FormLabel>Confirm Password <span className="text-destructive">*</span></FormLabel>
                           <FormControl>
-                            <Input type="password" placeholder="Confirm password" className="h-12 glass-input" {...field} />
+                            <Input type="password" placeholder="Re-enter your password" className="h-11 glass-input" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Upload Business Documents (Coming Soon)</label>
-                      <div className="border-2 border-dashed border-primary/20 bg-primary/5 rounded-xl p-8 text-center hover:border-primary/50 transition-all cursor-not-allowed opacity-70 group">
-                        <Upload className="h-12 w-12 mx-auto mb-4 text-primary group-hover:scale-110 transition-transform" />
-                        <p className="text-sm font-medium text-foreground">
-                          Upload CAC certificate, business license, or ID
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          PDF, PNG, JPG up to 10MB
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-xl p-6">
-                      <h3 className="font-semibold mb-3 flex items-center gap-2 text-green-700">
-                        <CheckCircle2 className="h-5 w-5" />
-                        What happens next?
-                      </h3>
-                      <ul className="space-y-2 text-sm text-muted-foreground ml-7">
-                        <li>• Your RC number is checked against the CAC database automatically</li>
-                        <li>• If your business name matches the CAC record, you're <span className="font-semibold text-green-700">approved instantly</span></li>
-                        <li>• If there's a mismatch, our team reviews within 48 hours</li>
-                        <li>• Verified vendors appear in search results and can receive bookings</li>
-                      </ul>
-                    </div>
                   </div>
 
-                  <div className="flex justify-between pt-4">
-                    <Button onClick={() => setStep(2)} variant="outline" size="lg" className="border-primary/20 hover:bg-primary/5" disabled={isSubmitting}>
+                  <div className="flex justify-between pt-2">
+                    <Button
+                      onClick={() => setStep(2)}
+                      variant="outline"
+                      size="lg"
+                      className="border-primary/20 hover:bg-primary/5"
+                      disabled={isSubmitting}
+                    >
                       Back
                     </Button>
-                    <Button type="submit" size="lg" className="px-8 shadow-lg hover:shadow-primary/50 transition-all duration-300" disabled={isSubmitting}>
+                    <Button
+                      type="submit"
+                      size="lg"
+                      className="px-8 shadow-lg hover:shadow-primary/50 transition-all duration-300"
+                      disabled={isSubmitting}
+                    >
                       {isSubmitting ? "Submitting..." : "Submit Application"}
                       {!isSubmitting && <CheckCircle2 className="ml-2 h-5 w-5" />}
                     </Button>
@@ -575,8 +704,6 @@ const VendorRegistration = () => {
           </Card>
         </div>
       </section>
-
-
     </div>
   );
 };

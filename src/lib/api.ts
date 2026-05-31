@@ -85,6 +85,14 @@ export const api = {
       tokenManager.removeToken();
       window.dispatchEvent(new CustomEvent("auth:logout"));
     },
+    forgotPassword: async (email: string) => {
+      const response = await apiClient.post("/api/auth/forgot-password", { email });
+      return response.data;
+    },
+    resetPassword: async (token: string, new_password: string) => {
+      const response = await apiClient.post("/api/auth/reset-password", { token, new_password });
+      return response.data;
+    },
   },
   vendors: {
     register: async (data: {
@@ -162,6 +170,39 @@ export const api = {
       return response.data;
     },
   },
+  serviceItems: {
+    getForVendor: async (vendorId: number) => {
+      const response = await apiClient.get(`/api/service-items/vendor/${vendorId}`);
+      return response.data;
+    },
+    getMine: async () => {
+      const response = await apiClient.get("/api/service-items/me");
+      return response.data;
+    },
+    create: async (data: {
+      name: string;
+      description?: string;
+      unit_price: number;
+      unit_label: string;
+      is_active?: boolean;
+    }) => {
+      const response = await apiClient.post("/api/service-items", data);
+      return response.data;
+    },
+    update: async (itemId: number, data: Partial<{
+      name: string;
+      description: string;
+      unit_price: number;
+      unit_label: string;
+      is_active: boolean;
+    }>) => {
+      const response = await apiClient.put(`/api/service-items/${itemId}`, data);
+      return response.data;
+    },
+    delete: async (itemId: number) => {
+      await apiClient.delete(`/api/service-items/${itemId}`);
+    },
+  },
   bookings: {
     create: async (data: {
       vendor_id: number;
@@ -171,6 +212,7 @@ export const api = {
       event_time?: string;
       notes?: string;
       payment_reference?: string;
+      service_items?: Array<{ service_item_id: number; quantity: number }>;
     }) => {
       const response = await apiClient.post("/api/bookings", data);
       return response.data;

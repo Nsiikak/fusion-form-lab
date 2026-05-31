@@ -16,15 +16,17 @@ class EventService:
     def get_user_events(
         db: Session,
         user_id: int,
-        status_filter: Optional[EventStatus] = None
+        status_filter: Optional[EventStatus] = None,
+        limit: int = 20,
+        offset: int = 0,
     ) -> List[Event]:
         """Get events for a user"""
         query = db.query(Event).filter(Event.customer_id == user_id)
-        
+
         if status_filter:
             query = query.filter(Event.status == status_filter)
-        
-        return query.order_by(Event.date.asc()).all()
+
+        return query.order_by(Event.date.asc()).limit(limit).offset(offset).all()
     
     @staticmethod
     def create_event(db: Session, event_data: EventCreate, customer_id: int) -> Event:
