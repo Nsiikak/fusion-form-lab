@@ -1,8 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 
 export const CTA = () => {
+  const { isAuthenticated } = useAuth();
   return (
     <section
       className="py-[100px] px-[5vw]"
@@ -35,14 +37,16 @@ export const CTA = () => {
               <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
             </Button>
           </Link>
-          <Link to="/vendor-registration">
-            <Button
-              variant="outline"
-              className="h-auto bg-transparent border-[1.5px] border-primary text-primary hover:bg-[hsl(var(--primary-light))] font-semibold px-8 py-4 rounded-xl text-base transition-all hover:-translate-y-px"
-            >
-              Learn More
-            </Button>
-          </Link>
+          {!isAuthenticated && (
+            <Link to="/vendor-registration">
+              <Button
+                variant="outline"
+                className="h-auto bg-transparent border-[1.5px] border-primary text-primary hover:bg-[hsl(var(--primary-light))] font-semibold px-8 py-4 rounded-xl text-base transition-all hover:-translate-y-px"
+              >
+                Become a Vendor
+              </Button>
+            </Link>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center justify-center gap-x-7 gap-y-2 text-muted-foreground text-sm">

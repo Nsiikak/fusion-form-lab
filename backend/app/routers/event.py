@@ -28,6 +28,8 @@ async def create_event(
 @router.get("", response_model=list[schema.EventResponse])
 async def get_my_events(
     status_filter: Optional[EventStatus] = Query(None, description="Filter by status"),
+    page: int = Query(1, ge=1, description="Page number"),
+    limit: int = Query(20, ge=1, le=100, description="Items per page"),
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
@@ -37,8 +39,9 @@ async def get_my_events(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only customers can access events"
         )
-    
-    return EventService.get_user_events(db, current_user.id, status_filter)
+
+    offset = (page - 1) * limit
+    return EventService.get_user_events(db, current_user.id, status_filter, limit=limit, offset=offset)
 
 @router.get("/{event_id}", response_model=schema.EventResponse)
 async def get_event(

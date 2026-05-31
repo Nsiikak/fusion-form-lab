@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum, ForeignKey, Text, Numeric, Date
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Enum, ForeignKey, Index, Text, Numeric, Date
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.core.database import Base
@@ -12,6 +12,11 @@ class EventStatus(str, enum.Enum):
 
 class Event(Base):
     __tablename__ = "events"
+    __table_args__ = (
+        Index("ix_events_customer_id", "customer_id"),
+        Index("ix_events_date", "date"),
+        Index("ix_events_status", "status"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     customer_id = Column(Integer, ForeignKey("users.id"), nullable=False)

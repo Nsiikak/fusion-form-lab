@@ -76,9 +76,13 @@ class PaystackService:
         """Verify account number"""
         url = f"{self.BASE_URL}/bank/resolve?account_number={account_number}&bank_code={bank_code}"
         response = requests.get(url, headers=self.headers)
+        print(f"[Paystack resolve] status={response.status_code} body={response.text}")
         if response.status_code == 200:
             return response.json()
-        return None
+        try:
+            return {"status": False, "paystack_message": response.json().get("message", "")}
+        except Exception:
+            return {"status": False, "paystack_message": response.text}
 
     def get_banks(self):
         """Get list of banks"""

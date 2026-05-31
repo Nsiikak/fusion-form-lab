@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Lock, BarChart3, CreditCard } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 
 const features = [
   {
@@ -30,6 +31,7 @@ const rows = [
 ];
 
 export const ForVendors = () => {
+  const { isAuthenticated } = useAuth();
   return (
     <section id="vendors" className="py-24 px-[5vw]">
       <div className="max-w-[1200px] mx-auto grid lg:grid-cols-2 gap-20 items-center">
@@ -117,11 +119,13 @@ export const ForVendors = () => {
           </div>
 
           <div className="mt-8 flex gap-3 flex-wrap">
-            <Link to="/vendor-registration">
-              <Button className="h-auto bg-primary hover:bg-[hsl(var(--primary-glow))] text-white font-semibold px-7 py-3.5 rounded-xl text-[15px] shadow-[var(--shadow-primary)]">
-                Register as Vendor
-              </Button>
-            </Link>
+            {!isAuthenticated && (
+              <Link to="/vendor-registration">
+                <Button className="h-auto bg-primary hover:bg-[hsl(var(--primary-glow))] text-white font-semibold px-7 py-3.5 rounded-xl text-[15px] shadow-[var(--shadow-primary)]">
+                  Register as Vendor
+                </Button>
+              </Link>
+            )}
             <Link to="/vendor-search">
               <Button
                 variant="outline"

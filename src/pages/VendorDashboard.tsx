@@ -1,12 +1,14 @@
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Footer } from "@/components/Footer";
 import {
   Calendar,
-  DollarSign,
+  Banknote,
   Star,
   TrendingUp,
   Users,
@@ -20,6 +22,12 @@ import {
   ShieldCheck,
   AlertTriangle,
   RefreshCw,
+  Info,
+  ArrowUp,
+  ArrowDown,
+  Sparkles,
+  Zap,
+  ArrowRight,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -27,10 +35,15 @@ import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
+const bookingRef = (id: number) =>
+  `PLG-${new Date().getFullYear()}-${String(id).padStart(4, "0")}`;
+
 const VendorDashboard = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [detailBooking, setDetailBooking] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState("bookings");
 
   const handleLogout = () => {
     logout();
@@ -87,6 +100,14 @@ const VendorDashboard = () => {
       return await api.reviews.getVendorReviews(vendorProfile.id);
     },
     enabled: !!vendorProfile,
+  });
+
+  // Check service items for setup completeness
+  const { data: myServiceItems = [] } = useQuery({
+    queryKey: ["my-service-items"],
+    queryFn: () => api.serviceItems.getMine(),
+    enabled: !!vendorProfile,
+    staleTime: 60_000,
   });
 
   const { data: ratingData } = useQuery({
@@ -249,6 +270,98 @@ const VendorDashboard = () => {
             </div>
           )}
 
+          {/* Setup Checklist — shown until all steps complete */}
+          {vendorProfile && (() => {
+            const hasBankDetails = !!(vendorProfile.account_number);
+            const hasServiceItems = (myServiceItems as any[]).length > 0;
+            const steps = [
+              {
+                id: "account",
+                label: "Vendor account created",
+                desc: "You're registered and listed on Plagohive",
+                done: true,
+                cta: null as string | null,
+                action: null as (() => void) | null,
+              },
+              {
+                id: "services",
+                label: "Add your service items & pricing",
+                desc: "Let customers pick exactly what they need — rice, DJ set, cocktails per person, etc.",
+                done: hasServiceItems,
+                cta: "Add Services",
+                action: () => navigate("/profile#services"),
+              },
+              {
+                id: "payouts",
+                label: "Set up bank details for payouts",
+                desc: "Required to receive payment when bookings complete. Without this, you can't get paid.",
+                done: hasBankDetails,
+                cta: "Set Up Payouts",
+                action: () => navigate("/profile#payouts"),
+              },
+            ];
+            const completedCount = steps.filter(s => s.done).length;
+            const allDone = completedCount === steps.length;
+            if (allDone) return null;
+            const remaining = steps.length - completedCount;
+
+            return (
+              <div className="mb-8 rounded-2xl border border-primary/20 overflow-hidden animate-fade-in-up">
+                {/* Header */}
+                <div className="bg-gradient-to-r from-primary/10 to-accent/5 px-5 py-4 flex items-center justify-between border-b border-primary/10">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center flex-shrink-0">
+                      <Zap className="h-4 w-4 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-foreground">
+                        {remaining === 1 ? "One last step" : `${remaining} steps left`} before you're ready to earn
+                      </p>
+                      <p className="text-xs text-muted-foreground">Complete your setup to start receiving bookings and getting paid</p>
+                    </div>
+                  </div>
+                  <div className="hidden sm:flex items-center gap-2 flex-shrink-0 ml-4">
+                    <div className="w-20 h-1.5 bg-white/60 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-primary to-[hsl(var(--primary-glow))] rounded-full transition-all duration-700"
+                        style={{ width: `${(completedCount / steps.length) * 100}%` }}
+                      />
+                    </div>
+                    <span className="text-xs font-bold text-primary whitespace-nowrap">{completedCount}/{steps.length}</span>
+                  </div>
+                </div>
+
+                {/* Step rows */}
+                <div className="bg-white divide-y divide-border">
+                  {steps.map((step) => (
+                    <div key={step.id} className={`flex items-center gap-4 px-5 py-4 transition-colors ${step.done ? "bg-muted/20" : "hover:bg-primary/5"}`}>
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${step.done ? "bg-green-500/10" : "bg-primary/10"}`}>
+                        {step.done
+                          ? <CheckCircle2 className="h-4 w-4 text-green-600" />
+                          : <div className="w-2.5 h-2.5 rounded-full bg-primary" />
+                        }
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-semibold ${step.done ? "text-muted-foreground line-through decoration-muted-foreground/40" : "text-foreground"}`}>
+                          {step.label}
+                        </p>
+                        {!step.done && (
+                          <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{step.desc}</p>
+                        )}
+                      </div>
+                      {!step.done && step.action && (
+                        <Button size="sm" className="flex-shrink-0 h-8 text-xs gap-1.5" onClick={step.action}>
+                          {step.cta}
+                          <ArrowRight className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Quick Stats */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12 animate-fade-in-up [animation-delay:200ms]">
             <Card className="bg-white border border-border p-6 hover:shadow-[var(--shadow-elevated)] transition-all">
@@ -264,7 +377,7 @@ const VendorDashboard = () => {
                   )}
                 </div>
                 <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center shadow-sm">
-                  <DollarSign className="h-6 w-6 text-primary" />
+                  <Banknote className="h-6 w-6 text-primary" />
                 </div>
               </div>
             </Card>
@@ -272,12 +385,12 @@ const VendorDashboard = () => {
             <Card className="bg-white border border-border p-6 hover:shadow-[var(--shadow-elevated)] transition-all">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Bookings</p>
+                  <p className="text-sm font-medium text-muted-foreground mb-1">Total Bookings</p>
                   {statsLoading ? (
                     <div className="h-9 w-16 bg-gray-200 animate-pulse rounded" />
                   ) : (
                     <p className="text-3xl font-bold text-accent">
-                      {stats?.active_bookings || 0}
+                      {stats?.total_bookings || 0}
                     </p>
                   )}
                 </div>
@@ -294,13 +407,13 @@ const VendorDashboard = () => {
                   {statsLoading ? (
                     <div className="h-9 w-16 bg-gray-200 animate-pulse rounded" />
                   ) : (
-                    <p className="text-3xl font-bold text-secondary">
+                    <p className="text-3xl font-bold text-yellow-500">
                       {(stats?.average_rating ?? 0) > 0 ? Number(stats!.average_rating).toFixed(1) : "N/A"}
                     </p>
                   )}
                 </div>
-                <div className="w-12 h-12 bg-secondary/10 rounded-2xl flex items-center justify-center shadow-sm">
-                  <Star className="h-6 w-6 text-secondary fill-secondary" />
+                <div className="w-12 h-12 bg-yellow-400/10 rounded-2xl flex items-center justify-center shadow-sm">
+                  <Star className="h-6 w-6 fill-yellow-400 text-yellow-400" />
                 </div>
               </div>
             </Card>
@@ -308,7 +421,7 @@ const VendorDashboard = () => {
             <Card className="bg-white border border-border p-6 hover:shadow-[var(--shadow-elevated)] transition-all">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Views</p>
+                  <p className="text-sm font-medium text-muted-foreground mb-1">Customers</p>
                   {statsLoading ? (
                     <div className="h-9 w-16 bg-gray-200 animate-pulse rounded" />
                   ) : (
@@ -325,7 +438,7 @@ const VendorDashboard = () => {
           </div>
 
           {/* Main Content */}
-          <Tabs defaultValue="bookings" className="space-y-8 animate-fade-in-up [animation-delay:400ms]">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8 animate-fade-in-up [animation-delay:400ms]">
             <TabsList className="bg-white/80 backdrop-blur-sm p-1 rounded-xl border border-white/20 w-fit shadow-sm">
               <TabsTrigger value="bookings" className="rounded-lg px-6 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-white transition-all font-medium">Bookings</TabsTrigger>
               <TabsTrigger value="reviews" className="rounded-lg px-6 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-white transition-all font-medium">Reviews</TabsTrigger>
@@ -357,17 +470,27 @@ const VendorDashboard = () => {
                       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                         <div className="space-y-3">
                           <div className="flex items-center gap-3 flex-wrap">
-                            <h3 className="text-lg font-bold text-foreground">Event ID: #{booking.event_id}</h3>
+                            <h3 className="text-lg font-bold text-foreground font-mono">{bookingRef(booking.id)}</h3>
                             <Badge
                               className={`${booking.status === "confirmed" ? "bg-green-500/10 text-green-700 hover:bg-green-500/20" :
                                 booking.status === "pending" ? "bg-orange-500/10 text-orange-700 hover:bg-orange-500/20" :
+                                booking.status === "awaiting_confirmation" ? "bg-purple-500/10 text-purple-700 hover:bg-purple-500/20" :
+                                booking.status === "completed" ? "bg-blue-500/10 text-blue-700 hover:bg-blue-500/20" :
                                   "bg-destructive/10 text-destructive hover:bg-destructive/20"
                                 }`}
                             >
                               {booking.status === "confirmed" && <CheckCircle2 className="h-3 w-3 mr-1" />}
                               {booking.status === "pending" && <Clock className="h-3 w-3 mr-1" />}
                               {booking.status === "completed" && <CheckCircle2 className="h-3 w-3 mr-1" />}
-                              {booking.status}
+                              {booking.status === "awaiting_confirmation" && <Clock className="h-3 w-3 mr-1" />}
+                              {{
+                                pending: "Pending",
+                                confirmed: "Confirmed",
+                                awaiting_confirmation: "Waiting for Customer",
+                                completed: "Completed",
+                                declined: "Declined",
+                                cancelled: "Cancelled",
+                              }[booking.status] ?? booking.status}
                             </Badge>
                           </div>
 
@@ -379,7 +502,7 @@ const VendorDashboard = () => {
                             </div>
                             <div className="flex items-center gap-2">
                               <Users className="h-4 w-4 text-primary" />
-                              Customer ID: {booking.customer_id}
+                              {booking.customer_name || "Customer"}
                             </div>
                           </div>
                         </div>
@@ -413,20 +536,47 @@ const VendorDashboard = () => {
                                 </Button>
                               </>
                             )}
-                            {booking.status === "confirmed" && (
-                              <Button
-                                size="sm"
-                                onClick={() => updateBookingStatus.mutate({ bookingId: booking.id, status: "completed" })}
-                                disabled={updateBookingStatus.isPending}
-                                className="bg-blue-600 hover:bg-blue-700 text-white"
-                              >
-                                <CheckCircle2 className="h-4 w-4 mr-1" />
-                                Mark Completed
-                              </Button>
+                            {booking.status === "confirmed" && (() => {
+                              const eventPassed = new Date(booking.event_date) <= new Date();
+                              return (
+                                <div className="flex flex-col items-end gap-1">
+                                  <Button
+                                    size="sm"
+                                    onClick={() => updateBookingStatus.mutate({ bookingId: booking.id, status: "awaiting_confirmation" })}
+                                    disabled={updateBookingStatus.isPending || !eventPassed}
+                                    className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
+                                  >
+                                    <CheckCircle2 className="h-4 w-4 mr-1" />
+                                    Mark Complete
+                                  </Button>
+                                  {!eventPassed && (
+                                    <p className="text-[11px] text-muted-foreground">
+                                      Available from {formatDate(booking.event_date)}
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            })()}
+                            {booking.status === "awaiting_confirmation" && (
+                              <div className="flex flex-col items-end gap-1">
+                                <Badge className="bg-purple-500/10 text-purple-700 border-purple-500/20 text-xs px-2 py-1">
+                                  <Clock className="h-3 w-3 mr-1" />
+                                  Waiting for Customer
+                                </Badge>
+                                <p className="text-[11px] text-muted-foreground">
+                                  Customer must confirm service before payment is released
+                                </p>
+                              </div>
                             )}
-                            {booking.status !== "pending" && booking.status !== "confirmed" && (
-                              <Button size="sm" variant="outline" className="border-primary/20 hover:bg-primary/5">View Details</Button>
-                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-primary/20 hover:bg-primary/5"
+                              onClick={() => setDetailBooking(booking)}
+                            >
+                              <Info className="h-3.5 w-3.5 mr-1" />
+                              Details
+                            </Button>
                           </div>
                         </div>
                       </div>
@@ -465,7 +615,7 @@ const VendorDashboard = () => {
                     <Card key={review.id} className="glass-panel p-6 bg-white/80 hover:bg-white/95 transition-colors">
                       <div className="flex items-start justify-between mb-3">
                         <div>
-                          <h3 className="font-bold mb-1 text-foreground">Customer #{review.customer_id}</h3>
+                          <h3 className="font-bold mb-1 text-foreground">{review.customer_name || "Verified Customer"}</h3>
                           <div className="flex items-center gap-1">
                             {[...Array(5)].map((_, i) => (
                               <Star
@@ -556,22 +706,273 @@ const VendorDashboard = () => {
             </TabsContent>
           </Tabs>
 
-          {/* Performance Chart Placeholder */}
-          <section className="mt-16 sm:pb-8">
-            <Card className="bg-white border border-border p-6">
-              <h2 className="text-2xl font-bold mb-6 text-foreground">Performance Overview</h2>
-              <div className="h-64 bg-gradient-to-br from-primary/5 to-accent/5 rounded-lg flex items-center justify-center border border-primary/10 border-dashed">
-                <div className="text-center">
-                  <TrendingUp className="h-16 w-16 mx-auto mb-4 text-primary/30" />
-                  <p className="text-muted-foreground font-medium">Performance analytics coming soon</p>
+          {/* Performance Analytics */}
+          <section className="mt-16 pb-8">
+            <Card className="bg-white border border-border p-6 md:p-8">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-8">
+                <div>
+                  <h2 className="text-2xl font-bold text-foreground">Performance Overview</h2>
+                  <p className="text-sm text-muted-foreground mt-1">Based on your booking history and activity</p>
                 </div>
+                <Badge className="bg-primary/10 text-primary border border-primary/20 text-xs px-3 py-1.5 w-fit">
+                  <Sparkles className="h-3 w-3 mr-1.5" />
+                  Advanced analytics coming soon
+                </Badge>
               </div>
+
+              {statsLoading ? (
+                <div className="h-64 flex items-center justify-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              ) : (
+                <div className="space-y-8">
+
+                  {/* Insight Cards */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {/* 30-Day Growth */}
+                    <div className="p-5 rounded-2xl bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/10">
+                      <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-3">30-Day Growth</p>
+                      <div className="flex items-end gap-2">
+                        <span className="text-3xl font-bold text-foreground">
+                          {Math.abs(stats?.growth_percentage ?? 0)}%
+                        </span>
+                        <span className={`flex items-center text-sm font-semibold mb-0.5 ${(stats?.growth_percentage ?? 0) >= 0 ? "text-green-600" : "text-red-500"}`}>
+                          {(stats?.growth_percentage ?? 0) >= 0
+                            ? <ArrowUp className="h-4 w-4" />
+                            : <ArrowDown className="h-4 w-4" />}
+                          vs last month
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Avg Booking Value */}
+                    <div className="p-5 rounded-2xl bg-gradient-to-br from-accent/5 to-accent/10 border border-accent/10">
+                      <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-3">Avg Booking Value</p>
+                      <span className="text-3xl font-bold text-foreground">
+                        ₦{(stats?.total_bookings ?? 0) > 0
+                          ? Math.round((stats?.total_earnings ?? 0) / stats!.total_bookings).toLocaleString()
+                          : "0"}
+                      </span>
+                    </div>
+
+                    {/* Acceptance Rate */}
+                    <div className="p-5 rounded-2xl bg-gradient-to-br from-green-500/5 to-green-500/10 border border-green-500/10">
+                      <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mb-3">Acceptance Rate</p>
+                      <span className="text-3xl font-bold text-foreground">
+                        {(() => {
+                          const accepted = bookings.filter((b: any) =>
+                            ["confirmed", "completed", "awaiting_confirmation"].includes(b.status)
+                          ).length;
+                          const decided = bookings.filter((b: any) =>
+                            ["confirmed", "completed", "awaiting_confirmation", "declined"].includes(b.status)
+                          ).length;
+                          return decided > 0 ? `${Math.round((accepted / decided) * 100)}%` : "N/A";
+                        })()}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Booking Status Distribution */}
+                  {bookings.length > 0 && (
+                    <div>
+                      <p className="text-sm font-semibold text-foreground mb-3">Booking Status Breakdown</p>
+                      {(() => {
+                        const counts = {
+                          pending: bookings.filter((b: any) => b.status === "pending").length,
+                          confirmed: bookings.filter((b: any) => b.status === "confirmed").length,
+                          awaiting: bookings.filter((b: any) => b.status === "awaiting_confirmation").length,
+                          completed: bookings.filter((b: any) => b.status === "completed").length,
+                          declined: bookings.filter((b: any) => b.status === "declined").length,
+                          cancelled: bookings.filter((b: any) => b.status === "cancelled").length,
+                        };
+                        const total = bookings.length;
+                        const segments = [
+                          { key: "pending",   color: "bg-orange-400", label: "Pending",    count: counts.pending },
+                          { key: "confirmed", color: "bg-green-500",  label: "Confirmed",  count: counts.confirmed },
+                          { key: "awaiting",  color: "bg-purple-500", label: "Awaiting",   count: counts.awaiting },
+                          { key: "completed", color: "bg-blue-500",   label: "Completed",  count: counts.completed },
+                          { key: "declined",  color: "bg-red-400",    label: "Declined",   count: counts.declined },
+                          { key: "cancelled", color: "bg-gray-300",   label: "Cancelled",  count: counts.cancelled },
+                        ].filter(s => s.count > 0);
+                        return (
+                          <>
+                            <div className="flex rounded-full overflow-hidden h-3 gap-0.5 mb-3">
+                              {segments.map(s => (
+                                <div
+                                  key={s.key}
+                                  className={`${s.color} transition-all duration-700`}
+                                  style={{ width: `${(s.count / total) * 100}%` }}
+                                />
+                              ))}
+                            </div>
+                            <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+                              {segments.map(s => (
+                                <span key={s.key} className="flex items-center gap-1.5">
+                                  <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${s.color}`} />
+                                  {s.label} <span className="font-semibold text-foreground ml-0.5">({s.count})</span>
+                                </span>
+                              ))}
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
+
+                  {/* Monthly Activity Chart */}
+                  {bookings.length > 0 && (
+                    <div>
+                      <p className="text-sm font-semibold text-foreground mb-4">Monthly Booking Activity</p>
+                      {(() => {
+                        const months = Array.from({ length: 6 }, (_, i) => {
+                          const d = new Date();
+                          d.setDate(1);
+                          d.setMonth(d.getMonth() - (5 - i));
+                          const year = d.getFullYear();
+                          const month = d.getMonth();
+                          const label = d.toLocaleString("default", { month: "short" });
+                          const bks = bookings.filter((b: any) => {
+                            const bd = new Date(b.created_at);
+                            return bd.getFullYear() === year && bd.getMonth() === month;
+                          });
+                          return { label, count: bks.length };
+                        });
+                        const maxCount = Math.max(...months.map(m => m.count), 1);
+                        return (
+                          <div className="flex items-end gap-2 sm:gap-3 h-36">
+                            {months.map((m, i) => (
+                              <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                                <span className="text-xs font-bold text-foreground h-4">
+                                  {m.count > 0 ? m.count : ""}
+                                </span>
+                                <div className="w-full flex flex-col justify-end" style={{ height: "80px" }}>
+                                  <div
+                                    className="w-full rounded-t-md bg-gradient-to-t from-primary to-[hsl(var(--primary-glow))] transition-all duration-700"
+                                    style={{
+                                      height: `${Math.max((m.count / maxCount) * 80, m.count > 0 ? 6 : 0)}px`,
+                                      opacity: m.count > 0 ? 1 : 0,
+                                    }}
+                                  />
+                                  {m.count === 0 && (
+                                    <div className="w-full rounded-t-md bg-muted" style={{ height: "4px" }} />
+                                  )}
+                                </div>
+                                <span className="text-[10px] text-muted-foreground font-medium">{m.label}</span>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+
+                  {/* Coming Soon Teaser */}
+                  <div className="border border-dashed border-primary/20 rounded-2xl p-5 bg-gradient-to-r from-primary/5 to-accent/5">
+                    <div className="flex items-start gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <Sparkles className="h-4 w-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-foreground mb-1">More Powerful Insights Coming Soon</p>
+                        <p className="text-xs text-muted-foreground mb-3">
+                          We're building deeper analytics to help you understand your business and grow faster.
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {["Revenue forecasting", "Peak season insights", "Customer retention", "Category benchmarks", "Response time tracking"].map(f => (
+                            <span key={f} className="text-xs bg-white text-primary px-2.5 py-1 rounded-full border border-primary/20 font-medium">
+                              {f}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              )}
             </Card>
           </section>
         </div>
       </section>
 
+      {/* Booking Detail Modal */}
+      <Dialog open={!!detailBooking} onOpenChange={(open) => !open && setDetailBooking(null)}>
+        <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Booking Details</DialogTitle>
+          </DialogHeader>
+          {detailBooking && (
+            <div className="space-y-4 pt-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Reference</p>
+                  <p className="text-sm font-bold font-mono tracking-wider">{bookingRef(detailBooking.id)}</p>
+                </div>
+                <Badge className={
+                  detailBooking.status === "confirmed" ? "bg-green-500/10 text-green-700" :
+                  detailBooking.status === "completed" ? "bg-blue-500/10 text-blue-700" :
+                  detailBooking.status === "pending" ? "bg-orange-500/10 text-orange-700" :
+                  "bg-gray-100 text-gray-700"
+                }>
+                  {detailBooking.status}
+                </Badge>
+              </div>
 
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="text-muted-foreground">Customer</div>
+                <div className="font-medium">{detailBooking.customer_name || "—"}</div>
+
+                <div className="text-muted-foreground">Event Date</div>
+                <div className="font-medium">{formatDate(detailBooking.event_date)}</div>
+
+                {detailBooking.event_time && (
+                  <>
+                    <div className="text-muted-foreground">Event Time</div>
+                    <div className="font-medium">{formatTime(detailBooking.event_time)}</div>
+                  </>
+                )}
+
+                <div className="text-muted-foreground">Payment</div>
+                <div className="flex items-center gap-1 font-medium text-green-700">
+                  <CheckCircle2 className="h-3.5 w-3.5" /> Paid
+                </div>
+
+                <div className="text-muted-foreground">Amount</div>
+                <div className="font-bold text-primary">₦{Number(detailBooking.price).toLocaleString()}</div>
+              </div>
+
+              {detailBooking.service_items_snapshot && detailBooking.service_items_snapshot.length > 0 && (
+                <div className="border border-border rounded-lg overflow-hidden">
+                  <div className="px-3 py-2 bg-muted/50 border-b border-border">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Services Ordered</p>
+                  </div>
+                  <div className="divide-y divide-border">
+                    {detailBooking.service_items_snapshot.map((s: any, i: number) => (
+                      <div key={i} className="flex justify-between items-center px-3 py-2 text-sm">
+                        <span>
+                          {s.name} <span className="text-muted-foreground">× {s.quantity}</span>
+                        </span>
+                        <span className="font-medium">₦{Number(s.subtotal).toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {detailBooking.notes && (
+                <div className="text-sm">
+                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Customer Notes</p>
+                  <p className="bg-muted/30 rounded-lg px-3 py-2">{detailBooking.notes}</p>
+                </div>
+              )}
+
+              <div className="pt-2 border-t">
+                <Button className="w-full" onClick={() => setDetailBooking(null)}>Close</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

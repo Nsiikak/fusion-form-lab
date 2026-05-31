@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from typing import List, Optional
 from fastapi import HTTPException, status
@@ -13,9 +13,17 @@ class ReviewService:
         return db.query(Review).filter(Review.id == review_id).first()
     
     @staticmethod
-    def get_vendor_reviews(db: Session, vendor_id: int) -> List[Review]:
-        """Get all reviews for a vendor"""
-        return db.query(Review).filter(Review.vendor_id == vendor_id).order_by(Review.created_at.desc()).all()
+    def get_vendor_reviews(db: Session, vendor_id: int, limit: int = 20, offset: int = 0) -> List[Review]:
+        """Get paginated reviews for a vendor, with customer name eager-loaded."""
+        return (
+            db.query(Review)
+            .filter(Review.vendor_id == vendor_id)
+            .options(joinedload(Review.customer))
+            .order_by(Review.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+            .all()
+        )
     
     @staticmethod
     def get_user_reviews(db: Session, user_id: int, user_role: str) -> List[Review]:
@@ -45,52 +53,48 @@ class ReviewService:
     
     @staticmethod
     def create_review(db: Session, review_data: ReviewCreate, customer_id: int) -> Review:
-        """Create a new review"""
-        # Verify booking exists and belongs to customer (if booking_id provided)
-        if review_data.booking_id:
-            booking = db.query(Booking).filter(Booking.id == review_data.booking_id).first()
-            if not booking:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Booking not found"
-                )
-            
-            if booking.customer_id != customer_id:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Not authorized to review this booking"
-                )
-            
-            # Check if review already exists for this booking
-            existing_review = db.query(Review).filter(Review.booking_id == review_data.booking_id).first()
-            if existing_review:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Review already exists for this booking"
-                )
-        
-        # Verify vendor exists
-        from app.entities.vendor.service import VendorService
-        vendor = VendorService.get_vendor_by_id(db, review_data.vendor_id)
-        if not vendor:
+        """Create a review. Requires a completed booking that belongs to the customer."""
+        # Booking is required — prevents fake / unbought reviews
+        booking = db.query(Booking).filter(Booking.id == review_data.booking_id).first()
+        if not booking:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
+
+        if booking.customer_id != customer_id:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Vendor not found"
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to review this booking",
             )
-        
-        # Create review
+
+        if booking.status != BookingStatus.COMPLETED:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="You can only review a vendor after the booking is completed",
+            )
+
+        if booking.vendor_id != review_data.vendor_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Vendor does not match the booking",
+            )
+
+        # One review per booking, enforced here and by DB unique constraint
+        existing_review = db.query(Review).filter(Review.booking_id == review_data.booking_id).first()
+        if existing_review:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="You have already reviewed this booking",
+            )
+
         db_review = Review(
             customer_id=customer_id,
             vendor_id=review_data.vendor_id,
             booking_id=review_data.booking_id,
             rating=review_data.rating,
-            comment=review_data.comment
+            comment=review_data.comment,
         )
-        
         db.add(db_review)
         db.commit()
         db.refresh(db_review)
-        
         return db_review
     
     @staticmethod

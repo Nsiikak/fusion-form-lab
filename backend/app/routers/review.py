@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import get_current_active_user
@@ -26,10 +26,13 @@ async def create_review(
 @router.get("/vendor/{vendor_id}", response_model=list[schema.ReviewResponse])
 async def get_vendor_reviews(
     vendor_id: int,
+    page: int = Query(1, ge=1, description="Page number"),
+    limit: int = Query(20, ge=1, le=100, description="Items per page"),
     db: Session = Depends(get_db)
 ):
-    """Get all reviews for a vendor"""
-    return ReviewService.get_vendor_reviews(db, vendor_id)
+    """Get paginated reviews for a vendor"""
+    offset = (page - 1) * limit
+    return ReviewService.get_vendor_reviews(db, vendor_id, limit=limit, offset=offset)
 
 @router.get("/vendor/{vendor_id}/rating", response_model=dict)
 async def get_vendor_rating(

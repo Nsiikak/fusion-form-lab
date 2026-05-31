@@ -4,8 +4,13 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, MapPin, Star, Clock, CheckCircle2, Package, LogOut, Loader2, CreditCard, ChevronRight, Utensils, Palette, Camera, Music, Truck, Building2, Store } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Calendar, Star, Clock, CheckCircle2, Package, LogOut, Loader2, CreditCard, Utensils, Palette, Camera, Music, Truck, Building2, Store, Info } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api";
@@ -94,6 +99,8 @@ const CustomerDashboard = () => {
   const queryClient = useQueryClient();
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
+  const [bookingDetailOpen, setBookingDetailOpen] = useState(false);
+  const [detailBooking, setDetailBooking] = useState<any>(null);
 
   const handleLogout = () => {
     logout();
@@ -108,12 +115,10 @@ const CustomerDashboard = () => {
     },
   });
 
-  // Fetch events
-  const { data: events = [], isLoading: eventsLoading } = useQuery({
+  // Fetch events (used to resolve event names on bookings)
+  const { data: events = [] } = useQuery({
     queryKey: ["events"],
-    queryFn: async () => {
-      return await api.events.list();
-    },
+    queryFn: async () => api.events.list(),
   });
 
   // Fetch bookings
@@ -124,14 +129,13 @@ const CustomerDashboard = () => {
     },
   });
 
-  // Filter upcoming events (date >= today)
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const upcomingEvents = events.filter((e: any) => {
-    const eventDate = new Date(e.date);
-    eventDate.setHours(0, 0, 0, 0);
-    return eventDate >= today && e.status !== "cancelled";
-  });
+  const getEventName = (eventId: number) => {
+    const event = events.find((e: any) => e.id === eventId);
+    return event?.name || null;
+  };
+
+  const bookingRef = (id: number) =>
+    `PLG-${new Date().getFullYear()}-${String(id).padStart(4, "0")}`;
 
   // Format date helper
   const formatDate = (dateString: string) => {
@@ -182,6 +186,9 @@ const CustomerDashboard = () => {
           </div>
 
           {/* Quick Stats */}
+          {(() => {
+            const needsConfirmation = (bookings as any[]).filter((b) => b.status === "awaiting_confirmation").length;
+            return (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12 animate-fade-in-up [animation-delay:200ms]">
             <Card className="bg-white border border-border p-6 hover:shadow-[var(--shadow-elevated)] transition-all">
               <div className="flex items-center justify-between">
@@ -200,136 +207,66 @@ const CustomerDashboard = () => {
             <Card className="bg-white border border-border p-6 hover:shadow-[var(--shadow-elevated)] transition-all">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Active Bookings</p>
-                  <p className="text-3xl font-bold text-accent">
-                    {statsLoading ? "..." : (stats?.active_bookings || 0)}
-                  </p>
-                </div>
-                <div className="w-12 h-12 bg-accent/10 rounded-2xl flex items-center justify-center">
-                  <Package className="h-6 w-6 text-accent" />
-                </div>
-              </div>
-            </Card>
-
-            <Card className="bg-white border border-border p-6 hover:shadow-[var(--shadow-elevated)] transition-all">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Confirmed</p>
-                  <p className="text-3xl font-bold text-secondary">
-                    {statsLoading ? "..." : (stats?.confirmed_bookings || 0)}
-                  </p>
-                </div>
-                <div className="w-12 h-12 bg-secondary/10 rounded-2xl flex items-center justify-center">
-                  <CheckCircle2 className="h-6 w-6 text-secondary" />
-                </div>
-              </div>
-            </Card>
-
-            <Card className="bg-white border border-border p-6 hover:shadow-[var(--shadow-elevated)] transition-all">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Pending</p>
+                  <p className="text-sm font-medium text-muted-foreground mb-1">Awaiting Vendor</p>
                   <p className="text-3xl font-bold text-orange-500">
                     {statsLoading ? "..." : (stats?.pending_bookings || 0)}
                   </p>
+                  <p className="text-xs text-muted-foreground mt-1">Vendor hasn't responded yet</p>
                 </div>
                 <div className="w-12 h-12 bg-orange-500/10 rounded-2xl flex items-center justify-center">
                   <Clock className="h-6 w-6 text-orange-500" />
                 </div>
               </div>
             </Card>
-          </div>
 
-          {/* Main Content */}
-          <Tabs defaultValue="events" className="space-y-8 animate-fade-in-up [animation-delay:400ms]">
-            <TabsList className="bg-white/50 backdrop-blur-sm p-1 rounded-xl border border-white/20 w-fit">
-              <TabsTrigger value="events" className="rounded-lg px-6 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-white transition-all">My Events</TabsTrigger>
-              <TabsTrigger value="bookings" className="rounded-lg px-6 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-white transition-all">All Bookings</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="events" className="space-y-6">
+            <Card className="bg-white border border-border p-6 hover:shadow-[var(--shadow-elevated)] transition-all">
               <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold">Upcoming Events</h2>
-                <Link to="/vendor-search">
-                  <Button className="shadow-lg hover:shadow-primary/30">
-                    <Calendar className="mr-2 h-4 w-4" />
-                    Plan New Event
-                  </Button>
-                </Link>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground mb-1">Vendor Accepted</p>
+                  <p className="text-3xl font-bold text-green-600">
+                    {statsLoading ? "..." : (stats?.confirmed_bookings || 0)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">Booked & ready for your event</p>
+                </div>
+                <div className="w-12 h-12 bg-green-500/10 rounded-2xl flex items-center justify-center">
+                  <CheckCircle2 className="h-6 w-6 text-green-600" />
+                </div>
               </div>
+            </Card>
 
-              {eventsLoading ? (
-                <div className="flex items-center justify-center py-20">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <Card className={`border p-6 hover:shadow-[var(--shadow-elevated)] transition-all ${needsConfirmation > 0 ? "bg-red-50 border-red-200" : "bg-white border-border"}`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className={`text-sm font-medium mb-1 ${needsConfirmation > 0 ? "text-red-600" : "text-muted-foreground"}`}>
+                    Release Payment
+                  </p>
+                  <p className={`text-3xl font-bold ${needsConfirmation > 0 ? "text-red-600" : "text-muted-foreground"}`}>
+                    {bookingsLoading ? "..." : needsConfirmation}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {needsConfirmation > 0 ? "Go to All Bookings to confirm" : "Nothing pending from you"}
+                  </p>
                 </div>
-              ) : upcomingEvents.length === 0 ? (
-                <Card className="bg-white border-2 border-dashed border-primary/20 p-12 text-center">
-                  <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
-                    <Calendar className="h-8 w-8 text-primary/50" />
-                  </div>
-                  <h3 className="text-lg font-bold mb-2">No events yet</h3>
-                  <p className="text-muted-foreground mb-6 max-w-sm mx-auto">Ready to plan something amazing? Start by finding vendors for your first event.</p>
-                  <Link to="/vendor-search">
-                    <Button size="lg" className="shadow-lg">Plan New Event</Button>
-                  </Link>
-                </Card>
-              ) : (
-                <div className="grid gap-6">
-                  {upcomingEvents.map((event: any) => {
-                    // Count bookings for this event
-                    const eventBookings = bookings.filter((b: any) => b.event_id === event.id);
-                    const confirmedEventBookings = eventBookings.filter((b: any) => b.status === "confirmed");
-                    const totalCost = confirmedEventBookings.reduce((sum: number, b: any) => sum + Number(b.price), 0);
-
-                    return (
-                      <Card key={event.id} className="bg-white border border-border p-6 hover:shadow-[var(--shadow-3d)] transition-all">
-                        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-                          <div className="space-y-4">
-                            <div className="flex items-center gap-3">
-                              <h3 className="text-xl font-bold">{event.name}</h3>
-                              <Badge variant={event.status === "confirmed" ? "default" : "secondary"} className="rounded-md px-2.5 py-0.5">
-                                {event.status}
-                              </Badge>
-                            </div>
-
-                            <div className="flex flex-wrap gap-6 text-sm text-muted-foreground">
-                              <div className="flex items-center gap-2">
-                                <Calendar className="h-4 w-4 text-primary" />
-                                {formatDate(event.date)}
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <MapPin className="h-4 w-4 text-primary" />
-                                {event.location}
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Package className="h-4 w-4 text-primary" />
-                                {confirmedEventBookings.length} vendor{confirmedEventBookings.length !== 1 ? 's' : ''} booked
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 border-t pt-4 lg:border-t-0 lg:pt-0 lg:border-l lg:pl-6 border-border/10">
-                            <div className="text-right">
-                              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Cost</p>
-                              <p className="text-2xl font-bold text-primary">
-                                ₦{totalCost.toLocaleString()}
-                              </p>
-                            </div>
-                            <Button variant="outline" className="border-primary/20 hover:bg-primary/5">
-                              View Details
-                              <ChevronRight className="ml-1 h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      </Card>
-                    );
-                  })}
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${needsConfirmation > 0 ? "bg-red-500/10" : "bg-muted/40"}`}>
+                  <CreditCard className={`h-6 w-6 ${needsConfirmation > 0 ? "text-red-500" : "text-muted-foreground"}`} />
                 </div>
-              )}
-            </TabsContent>
+              </div>
+            </Card>
+          </div>
+            );
+          })()}
 
-            <TabsContent value="bookings" className="space-y-6">
-              <h2 className="text-2xl font-bold">All Bookings</h2>
+          {/* Bookings */}
+          <div className="space-y-6 animate-fade-in-up [animation-delay:400ms]">
+            <div className="flex items-center justify-between">
+              <h2 className="text-2xl font-bold">My Bookings</h2>
+              <Link to="/vendor-search">
+                <Button className="shadow-lg hover:shadow-primary/30">
+                  <Calendar className="mr-2 h-4 w-4" />
+                  Book a Vendor
+                </Button>
+              </Link>
+            </div>
 
               {bookingsLoading ? (
                 <div className="flex items-center justify-center py-20">
@@ -353,17 +290,27 @@ const CustomerDashboard = () => {
                       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                         <div className="space-y-3">
                           <div className="flex items-center gap-3 flex-wrap">
-                            <h3 className="text-lg font-bold">{booking.vendor_name || `Vendor #${booking.vendor_id}`}</h3>
+                            <h3 className="text-lg font-bold">{booking.vendor_name}</h3>
+                            <span className="text-xs font-mono text-muted-foreground">{bookingRef(booking.id)}</span>
                             {booking.vendor_category && (
                               <Badge variant="secondary" className="bg-secondary/10 text-secondary-foreground hover:bg-secondary/20">{booking.vendor_category}</Badge>
                             )}
                             <Badge
                               className={`${booking.status === "confirmed" ? "bg-green-500/10 text-green-700 hover:bg-green-500/20" :
                                 booking.status === "pending" ? "bg-orange-500/10 text-orange-700 hover:bg-orange-500/20" :
+                                booking.status === "awaiting_confirmation" ? "bg-purple-500/10 text-purple-700 hover:bg-purple-500/20" :
+                                booking.status === "completed" ? "bg-blue-500/10 text-blue-700 hover:bg-blue-500/20" :
                                   "bg-gray-100 text-gray-700 hover:bg-gray-200"
                                 }`}
                             >
-                              {booking.status}
+                              {{
+                                pending: "Pending",
+                                confirmed: "Confirmed",
+                                awaiting_confirmation: "Action Required",
+                                completed: "Completed",
+                                declined: "Declined",
+                                cancelled: "Cancelled",
+                              }[booking.status] ?? booking.status}
                             </Badge>
                           </div>
 
@@ -375,7 +322,7 @@ const CustomerDashboard = () => {
                             {booking.event_id && (
                               <div className="flex items-center gap-2">
                                 <Package className="h-4 w-4 text-primary" />
-                                Event ID: {booking.event_id}
+                                {getEventName(booking.event_id) || `Booking #${booking.id}`}
                               </div>
                             )}
                           </div>
@@ -386,7 +333,13 @@ const CustomerDashboard = () => {
                             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Price</p>
                             <p className="text-xl font-bold text-primary">₦{Number(booking.price).toLocaleString()}</p>
                           </div>
-                          <div className="flex gap-2">
+                          <div className="flex gap-2 flex-wrap items-center">
+                            {booking.status === "confirmed" && (
+                              <span className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/60 border border-border rounded-full px-3 py-1.5">
+                                <Clock className="h-3.5 w-3.5 flex-shrink-0" />
+                                Waiting for vendor to mark service complete
+                              </span>
+                            )}
                             {booking.status === "pending" && (
                               <Button
                                 variant="outline"
@@ -404,31 +357,44 @@ const CustomerDashboard = () => {
                               >
                                 Cancel
                               </Button>
-
                             )}
-                            {booking.status === "confirmed" && (
-                              <Button
-                                size="sm"
-                                className="bg-green-600 hover:bg-green-700 text-white shadow-md"
-                                onClick={async () => {
-                                  try {
-                                    await api.bookings.updateStatus(booking.id, "completed");
-                                    toast.success("Booking marked as completed!");
-                                    queryClient.invalidateQueries({ queryKey: ["bookings"] });
-                                    // Open review modal immediately after completion
-                                    setSelectedBooking(booking);
-                                    setIsReviewModalOpen(true);
-                                  } catch (error) {
-                                    toast.error("Failed to update status");
-                                  }
-                                }}
-                              >
-                                <CheckCircle2 className="h-4 w-4 mr-1" />
-                                Confirm Completion
-                              </Button>
-                            )}
+                            {booking.status === "awaiting_confirmation" && (() => {
+                              const confirmedAt = booking.vendor_confirmed_at
+                                ? new Date(booking.vendor_confirmed_at)
+                                : null;
+                              const autoReleaseAt = confirmedAt
+                                ? new Date(confirmedAt.getTime() + 24 * 60 * 60 * 1000)
+                                : null;
+                              const hoursLeft = autoReleaseAt
+                                ? Math.max(0, Math.ceil((autoReleaseAt.getTime() - Date.now()) / 3_600_000))
+                                : null;
+                              return (
+                                <div className="flex flex-col items-start gap-1">
+                                  <Button
+                                    size="sm"
+                                    className="bg-green-600 hover:bg-green-700 text-white shadow-md font-semibold"
+                                    onClick={async () => {
+                                      try {
+                                        await api.bookings.updateStatus(booking.id, "completed");
+                                        toast.success("Payment released to vendor. Thank you!");
+                                        queryClient.invalidateQueries({ queryKey: ["bookings"] });
+                                        queryClient.invalidateQueries({ queryKey: ["customer-stats"] });
+                                      } catch (error: any) {
+                                        toast.error(error.response?.data?.detail || "Failed to confirm");
+                                      }
+                                    }}
+                                  >
+                                    <CheckCircle2 className="h-4 w-4 mr-1.5" />
+                                    Confirm Service &amp; Release Payment
+                                  </Button>
+                                  <p className="text-[11px] text-muted-foreground pl-0.5">
+                                    Vendor marked this service complete.{hoursLeft !== null ? ` Auto-releases in ~${hoursLeft}h if no action.` : ""}
+                                  </p>
+                                </div>
+                              );
+                            })()}
 
-                            {booking.status === "completed" && (
+                            {booking.status === "completed" && !booking.has_review && (
                               <Button
                                 size="sm"
                                 className="bg-yellow-500 hover:bg-yellow-600 text-white"
@@ -438,10 +404,25 @@ const CustomerDashboard = () => {
                                 }}
                               >
                                 <Star className="h-4 w-4 mr-1" />
-                                Rate Provider
+                                Rate Vendor
                               </Button>
                             )}
-                            <Button size="sm" className="shadow-md" onClick={() => navigate(`/vendors/${booking.vendor_id}`)}>View Details</Button>
+
+                            {booking.status === "completed" && booking.has_review && (
+                              <span className="flex items-center gap-1 text-sm font-medium text-green-600">
+                                <CheckCircle2 className="h-4 w-4" />
+                                Reviewed
+                              </span>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-primary/20 hover:bg-primary/5"
+                              onClick={() => { setDetailBooking(booking); setBookingDetailOpen(true); }}
+                            >
+                              <Info className="h-4 w-4 mr-1" />
+                              Details
+                            </Button>
                           </div>
                         </div>
                       </div>
@@ -449,8 +430,7 @@ const CustomerDashboard = () => {
                   ))}
                 </div>
               )}
-            </TabsContent>
-          </Tabs>
+          </div>
 
           {/* Recommended Vendors */}
           <RecommendedVendors />
@@ -466,16 +446,106 @@ const CustomerDashboard = () => {
               }}
               onReviewSubmitted={() => {
                 queryClient.invalidateQueries({ queryKey: ["bookings"] });
-                // Also invalidate reviews if we had them here, but mostly bookings history update (maybe add 'Reviewed' badge later?)
-                // For now just close.
+                queryClient.invalidateQueries({ queryKey: ["vendor-reviews", String(selectedBooking.vendor_id)] });
               }}
             />
           )}
+
+          {/* Booking Detail Modal */}
+          <Dialog open={bookingDetailOpen} onOpenChange={setBookingDetailOpen}>
+            <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Booking Details</DialogTitle>
+              </DialogHeader>
+              {detailBooking && (
+                <div className="space-y-4 pt-2">
+                  {/* Reference & status row */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">Reference</p>
+                      <p className="text-sm font-bold font-mono tracking-wider">{bookingRef(detailBooking.id)}</p>
+                    </div>
+                    <Badge className={
+                      detailBooking.status === "confirmed" ? "bg-green-500/10 text-green-700" :
+                      detailBooking.status === "completed" ? "bg-blue-500/10 text-blue-700" :
+                      detailBooking.status === "pending" ? "bg-orange-500/10 text-orange-700" :
+                      "bg-gray-100 text-gray-700"
+                    }>
+                      {detailBooking.status}
+                    </Badge>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="text-muted-foreground">Vendor</div>
+                    <div className="font-medium">{detailBooking.vendor_name}</div>
+
+                    {detailBooking.vendor_category && (
+                      <>
+                        <div className="text-muted-foreground">Category</div>
+                        <div className="font-medium capitalize">{detailBooking.vendor_category}</div>
+                      </>
+                    )}
+
+                    {detailBooking.event_id && (
+                      <>
+                        <div className="text-muted-foreground">Event</div>
+                        <div className="font-medium">{getEventName(detailBooking.event_id) || "—"}</div>
+                      </>
+                    )}
+
+                    <div className="text-muted-foreground">Event Date</div>
+                    <div className="font-medium">{formatDate(detailBooking.event_date)}</div>
+
+                    <div className="text-muted-foreground">Payment</div>
+                    <div className="flex items-center gap-1 font-medium text-green-700">
+                      <CheckCircle2 className="h-3.5 w-3.5" /> Paid
+                    </div>
+
+                    <div className="text-muted-foreground">Total Paid</div>
+                    <div className="font-bold text-primary">₦{Number(detailBooking.price).toLocaleString()}</div>
+                  </div>
+
+                  {/* Service items breakdown */}
+                  {detailBooking.service_items_snapshot && detailBooking.service_items_snapshot.length > 0 && (
+                    <div className="border border-border rounded-lg overflow-hidden">
+                      <div className="px-3 py-2 bg-muted/50 border-b border-border">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Services Ordered</p>
+                      </div>
+                      <div className="divide-y divide-border">
+                        {detailBooking.service_items_snapshot.map((s: any, i: number) => (
+                          <div key={i} className="flex justify-between items-center px-3 py-2 text-sm">
+                            <span className="text-foreground">
+                              {s.name} <span className="text-muted-foreground">× {s.quantity}</span>
+                            </span>
+                            <span className="font-medium">₦{Number(s.subtotal).toLocaleString()}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {detailBooking.notes && (
+                    <div className="text-sm">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Notes</p>
+                      <p className="text-foreground bg-muted/30 rounded-lg px-3 py-2">{detailBooking.notes}</p>
+                    </div>
+                  )}
+
+                  <div className="pt-2 border-t flex gap-2">
+                    <Link to={`/vendors/${detailBooking.vendor_id}`} className="flex-1">
+                      <Button variant="outline" className="w-full" onClick={() => setBookingDetailOpen(false)}>
+                        View Vendor
+                      </Button>
+                    </Link>
+                    <Button className="flex-1" onClick={() => setBookingDetailOpen(false)}>Close</Button>
+                  </div>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
         </div>
-      </section >
-
-
-    </div >
+      </section>
+    </div>
   );
 };
 

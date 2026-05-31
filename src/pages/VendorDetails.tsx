@@ -20,7 +20,6 @@ import {
     Share2,
     Loader2,
     Building2,
-    User,
     LogIn,
     UserPlus,
     CalendarCheck,
@@ -31,6 +30,7 @@ import {
     Music,
     Truck,
 } from "lucide-react";
+import { format } from "date-fns";
 
 const categoryIconMap: Record<string, React.ElementType> = {
     catering: Utensils,
@@ -72,6 +72,16 @@ const VendorDetails = () => {
             return await api.reviews.getVendorReviews(parseInt(id));
         },
         enabled: !!id,
+    });
+
+    const { data: serviceItems = [] } = useQuery({
+        queryKey: ["service-items", id],
+        queryFn: async () => {
+            if (!id) return [];
+            return await api.serviceItems.getForVendor(parseInt(id));
+        },
+        enabled: !!id,
+        staleTime: 60_000,
     });
 
     const handleBookClick = () => {
@@ -195,56 +205,118 @@ const VendorDetails = () => {
 
                             <section className="animate-fade-in-up [animation-delay:200ms]">
                                 <h2 className="text-2xl font-bold mb-4">Services & Pricing</h2>
-                                <Card className="p-6 bg-white border border-border shadow-sm">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <div>
-                                            <h3 className="font-semibold text-lg">Standard Service Package</h3>
-                                            <p className="text-sm text-muted-foreground">Starting price for base services</p>
-                                        </div>
-                                        <div className="text-right">
-                                            <span className="text-2xl font-bold text-primary">₦{vendor.starting_price.toLocaleString()}</span>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        {["Professional Service", "Quality Assurance", "Timely Delivery"].map((feature) => (
-                                            <div key={feature} className="flex items-center gap-2 text-sm">
-                                                <CheckCircle2 className="h-4 w-4 text-green-500" />
-                                                {feature}
+                                {(serviceItems as any[]).length > 0 ? (
+                                    <Card className="bg-white border border-border shadow-sm overflow-hidden">
+                                        {/* Base rate row — always at the top */}
+                                        <div className="flex items-center justify-between px-6 py-4 bg-primary/5 border-b border-border">
+                                            <div>
+                                                <p className="text-sm font-semibold text-foreground">Base Rate</p>
+                                                <p className="text-xs text-muted-foreground">Always included with every booking</p>
                                             </div>
-                                        ))}
-                                    </div>
-                                </Card>
+                                            <span className="text-sm font-bold text-primary">
+                                                ₦{Number(vendor.starting_price).toLocaleString()}
+                                            </span>
+                                        </div>
+
+                                        {/* Add-on service items */}
+                                        <div className="px-6 py-2 border-b border-border bg-muted/30">
+                                            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Add-on Services</p>
+                                        </div>
+                                        <div className="divide-y divide-border">
+                                            {(serviceItems as any[]).map((item: any) => (
+                                                <div key={item.id} className="flex items-center justify-between px-6 py-4">
+                                                    <div>
+                                                        <p className="text-sm font-medium text-foreground">{item.name}</p>
+                                                        {item.description && (
+                                                            <p className="text-xs text-muted-foreground mt-0.5">{item.description}</p>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-right flex-shrink-0 ml-4">
+                                                        <span className="text-sm font-bold text-primary">
+                                                            ₦{Number(item.unit_price).toLocaleString()}
+                                                        </span>
+                                                        <span className="text-xs text-muted-foreground ml-1">/ {item.unit_label}</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="px-6 py-4 bg-muted/30 border-t border-border">
+                                            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                                                <CheckCircle2 className="h-3.5 w-3.5 text-green-500 flex-shrink-0" />
+                                                Your total = base rate + the services you select when booking
+                                            </p>
+                                        </div>
+                                    </Card>
+                                ) : (
+                                    <Card className="p-6 bg-white border border-border shadow-sm">
+                                        <div className="flex items-center justify-between mb-4">
+                                            <div>
+                                                <h3 className="font-semibold text-lg">Fixed Rate Service</h3>
+                                                <p className="text-sm text-muted-foreground">Flat fee — price covers the full service</p>
+                                            </div>
+                                            <span className="text-2xl font-bold text-primary">₦{Number(vendor.starting_price).toLocaleString()}</span>
+                                        </div>
+                                        <div className="space-y-2">
+                                            {["Professional Service", "Quality Assurance", "Timely Delivery"].map((feature) => (
+                                                <div key={feature} className="flex items-center gap-2 text-sm">
+                                                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                                                    {feature}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </Card>
+                                )}
                             </section>
 
                             <section className="animate-fade-in-up [animation-delay:400ms]">
-                                <h2 className="text-2xl font-bold mb-4">Reviews</h2>
+                                <h2 className="text-2xl font-bold mb-4">
+                                    Reviews
+                                    {reviews.length > 0 && (
+                                        <span className="ml-2 text-base font-normal text-muted-foreground">({reviews.length})</span>
+                                    )}
+                                </h2>
                                 <div className="space-y-4">
                                     {reviews.length === 0 ? (
-                                        <Card className="p-8 text-center bg-white border border-dashed border-border">
-                                            <p className="text-muted-foreground">No reviews yet.</p>
+                                        <Card className="p-10 text-center bg-white border border-dashed border-border">
+                                            <Star className="h-8 w-8 text-gray-200 mx-auto mb-3" />
+                                            <p className="font-medium mb-1">No reviews yet</p>
+                                            <p className="text-sm text-muted-foreground">Be the first to review this vendor after booking.</p>
                                         </Card>
                                     ) : (
-                                        reviews.map((review: any) => (
-                                            <Card key={review.id} className="p-6 bg-white border border-border shadow-sm">
-                                                <div className="flex items-start justify-between mb-2">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                                            <User className="h-4 w-4 text-primary" />
+                                        reviews.map((review: any) => {
+                                            const name: string = review.customer_name || "Verified Customer";
+                                            const initials = name.split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
+                                            return (
+                                                <Card key={review.id} className="p-6 bg-white border border-border shadow-sm">
+                                                    <div className="flex items-start justify-between mb-3">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                                                <span className="text-xs font-bold text-primary">{initials}</span>
+                                                            </div>
+                                                            <div>
+                                                                <p className="font-medium text-sm leading-tight">{name}</p>
+                                                                <p className="text-xs text-muted-foreground">
+                                                                    {review.created_at
+                                                                        ? format(new Date(review.created_at), "MMM d, yyyy")
+                                                                        : ""}
+                                                                </p>
+                                                            </div>
                                                         </div>
-                                                        <span className="font-medium">Customer</span>
+                                                        <div className="flex gap-0.5 flex-shrink-0">
+                                                            {[...Array(5)].map((_, i) => (
+                                                                <Star
+                                                                    key={i}
+                                                                    className={`h-4 w-4 ${i < review.rating ? "fill-yellow-400 text-yellow-400" : "text-gray-200"}`}
+                                                                />
+                                                            ))}
+                                                        </div>
                                                     </div>
-                                                    <div className="flex gap-1">
-                                                        {[...Array(5)].map((_, i) => (
-                                                            <Star
-                                                                key={i}
-                                                                className={`h-4 w-4 ${i < review.rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"}`}
-                                                            />
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                                <p className="text-muted-foreground">{review.comment}</p>
-                                            </Card>
-                                        ))
+                                                    {review.comment && (
+                                                        <p className="text-sm text-muted-foreground leading-relaxed">{review.comment}</p>
+                                                    )}
+                                                </Card>
+                                            );
+                                        })
                                     )}
                                 </div>
                             </section>
@@ -254,15 +326,18 @@ const VendorDetails = () => {
                         <div className="space-y-6">
                             <Card className="p-6 bg-white border border-border shadow-sm sticky top-24">
                                 <h3 className="font-bold text-lg mb-4">Book this Vendor</h3>
-                                <div className="space-y-4 mb-6">
+                                <div className="space-y-3 mb-6">
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-muted-foreground">Starting Price</span>
-                                        <span className="font-semibold">₦{vendor.starting_price.toLocaleString()}</span>
+                                        <span className="text-muted-foreground">Base rate</span>
+                                        <span className="font-semibold">₦{Number(vendor.starting_price).toLocaleString()}</span>
                                     </div>
                                     <div className="flex justify-between text-sm">
                                         <span className="text-muted-foreground">Response Time</span>
                                         <span className="font-semibold">~24 hours</span>
                                     </div>
+                                    <p className="text-[11px] text-muted-foreground bg-muted/50 rounded-lg px-3 py-2 leading-relaxed">
+                                        Base rate is always charged. Additional services you select are added on top.
+                                    </p>
                                 </div>
                                 <Button className="w-full shadow-lg" size="lg" onClick={handleBookClick}>
                                     Request Booking

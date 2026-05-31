@@ -1,8 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { Search, CheckCircle2, PartyPopper } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 
 export const Hero = () => {
+  const { isAuthenticated } = useAuth();
   return (
     <section
       className="relative min-h-screen flex items-center overflow-hidden pt-[150px] pb-20 px-[5vw]"
@@ -76,14 +78,16 @@ export const Hero = () => {
                 Find Vendors
               </Button>
             </Link>
-            <Link to="/vendor-registration">
-              <Button
-                variant="outline"
-                className="h-auto bg-transparent border-[1.5px] border-primary text-primary hover:bg-[hsl(var(--primary-light))] font-semibold px-7 py-3.5 rounded-xl text-[15px] transition-all hover:-translate-y-px"
-              >
-                Become a Vendor
-              </Button>
-            </Link>
+            {!isAuthenticated && (
+              <Link to="/vendor-registration">
+                <Button
+                  variant="outline"
+                  className="h-auto bg-transparent border-[1.5px] border-primary text-primary hover:bg-[hsl(var(--primary-light))] font-semibold px-7 py-3.5 rounded-xl text-[15px] transition-all hover:-translate-y-px"
+                >
+                  Become a Vendor
+                </Button>
+              </Link>
+            )}
           </div>
 
           {/* Stats */}

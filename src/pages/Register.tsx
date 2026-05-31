@@ -19,7 +19,12 @@ import { ArrowRight, Loader2 } from "lucide-react";
 
 const registerSchema = z.object({
   email: z.string().email("Invalid email address"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: z
+    .string()
+    .min(8, "At least 8 characters")
+    .regex(/[A-Za-z]/, "Must include at least one letter")
+    .regex(/[0-9]/, "Must include at least one number")
+    .regex(/[^A-Za-z0-9]/, "Must include at least one special character"),
   confirmPassword: z.string(),
   full_name: z.string().optional(),
   phone_number: z.string().optional(),
