@@ -119,7 +119,9 @@ const VendorSearch = () => {
             </Link>
             <nav className="hidden md:flex items-center gap-6">
               <Link to="/vendor-search" className="text-sm font-medium hover:text-primary transition-colors">Find Vendors</Link>
-              <Link to="/vendor-registration" className="text-sm font-medium hover:text-primary transition-colors">Become a Vendor</Link>
+              {!isAuthenticated && (
+                <Link to="/vendor-registration" className="text-sm font-medium hover:text-primary transition-colors">Become a Vendor</Link>
+              )}
               {isAuthenticated ? (
                 <>
                   {user?.role === "customer" && (
@@ -262,7 +264,7 @@ const VendorSearch = () => {
 
                       <div className="flex items-center justify-between pt-4 border-t">
                         <div>
-                          <p className="text-sm text-muted-foreground">Starting from</p>
+                          <p className="text-sm text-muted-foreground">Base rate from</p>
                           <p className="text-xl font-bold text-primary">
                             ₦{Number(vendor.starting_price).toLocaleString()}
                           </p>

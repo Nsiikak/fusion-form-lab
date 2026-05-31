@@ -43,6 +43,7 @@ import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
+import { useEffect } from "react";
 
 const step1Schema = z.object({
   business_name: z.string().min(1, "Business name is required"),
@@ -133,7 +134,16 @@ const PwCheck = ({ met, label }: { met: boolean; label: string }) => (
 
 const VendorRegistration = () => {
   const navigate = useNavigate();
-  const { refreshUser } = useAuth();
+  const { refreshUser, isAuthenticated, user } = useAuth();
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    if (user?.role === "vendor") {
+      navigate("/vendor-dashboard", { replace: true });
+    } else if (user?.role === "customer") {
+      navigate("/customer-dashboard", { replace: true });
+    }
+  }, [isAuthenticated, user?.role]);
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedPhotos, setSelectedPhotos] = useState<File[]>([]);
@@ -484,7 +494,7 @@ const VendorRegistration = () => {
                       name="starting_price"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Starting Price (₦) <span className="text-destructive">*</span></FormLabel>
+                          <FormLabel>Base Rate (₦) <span className="text-destructive">*</span></FormLabel>
                           <FormControl>
                             <div className="relative">
                               <Banknote className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
@@ -492,7 +502,7 @@ const VendorRegistration = () => {
                             </div>
                           </FormControl>
                           <p className="text-xs text-muted-foreground mt-1">
-                            Your minimum package price. You can add detailed service items later from your dashboard.
+                            Charged on every booking. Add-on services are priced separately from your dashboard.
                           </p>
                           <FormMessage />
                         </FormItem>
@@ -521,6 +531,38 @@ const VendorRegistration = () => {
                         </FormItem>
                       )}
                     />
+                  </div>
+
+                  {/* Base rate explainer */}
+                  <div className="rounded-xl border border-primary/15 bg-primary/5 p-4 space-y-3">
+                    <p className="text-xs font-bold text-primary uppercase tracking-widest">What is a base rate?</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Your base rate is charged on <span className="font-semibold text-foreground">every booking</span> — it covers your time, travel, and setup regardless of what services the customer selects. Think of it as your engagement fee.
+                    </p>
+                    <div className="space-y-2.5">
+                      {[
+                        {
+                          type: "DJ / Photographer",
+                          tip: "Set your full service fee as the base rate. Customers pay one flat price — no add-ons needed.",
+                        },
+                        {
+                          type: "Caterer / Bar service",
+                          tip: "Set a small setup fee (e.g. ₦20,000). Then list your menu items (Rice, Cocktails…) as priced services from your dashboard — customers pick what they want.",
+                        },
+                        {
+                          type: "Decorator / Venue",
+                          tip: "Set your minimum engagement fee here. Add package tiers or specific décor items as services after sign-up.",
+                        },
+                      ].map(({ type, tip }) => (
+                        <div key={type} className="flex gap-2.5 text-xs">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-primary flex-shrink-0 mt-0.5" />
+                          <span>
+                            <span className="font-semibold text-foreground">{type}:</span>{" "}
+                            <span className="text-muted-foreground">{tip}</span>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
 
                   <SectionDivider label="Portfolio Photos" />

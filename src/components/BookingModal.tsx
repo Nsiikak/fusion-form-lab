@@ -59,12 +59,12 @@ const BookingModal = ({ isOpen, onClose, vendor }: BookingModalProps) => {
 
     const hasItems = serviceItems.length > 0;
 
-    // Compute booking total (base price — what vendor receives minus platform commission)
+    // Base rate is always charged; service items are additive on top
     const cartTotal = Array.from(cart.values()).reduce(
         (sum, entry) => sum + Number(entry.item.unit_price) * entry.quantity,
         0,
     );
-    const baseTotal = hasItems ? Math.max(cartTotal, startingPrice) : startingPrice;
+    const baseTotal = startingPrice + cartTotal;
 
     // 2.5% customer-side service fee (platform keeps this in addition to the 10% vendor commission)
     const SERVICE_FEE_RATE = 0.025;
@@ -276,35 +276,28 @@ const BookingModal = ({ isOpen, onClose, vendor }: BookingModalProps) => {
 
                     {/* Price summary */}
                     <div className="bg-primary/5 p-4 rounded-lg border border-primary/10 space-y-2">
-                        {hasItems && cart.size > 0 ? (
-                            <>
-                                {Array.from(cart.values()).map((entry) => (
-                                    <div key={entry.item.id} className="flex justify-between text-sm">
-                                        <span className="text-muted-foreground">
-                                            {entry.item.name} × {entry.quantity}
-                                        </span>
-                                        <span className="font-medium">
-                                            ₦{(Number(entry.item.unit_price) * entry.quantity).toLocaleString()}
-                                        </span>
-                                    </div>
-                                ))}
-                                {cartTotal < startingPrice && (
-                                    <div className="flex justify-between text-sm text-orange-600">
-                                        <span>Minimum charge applies</span>
-                                        <span className="font-medium">₦{startingPrice.toLocaleString()}</span>
-                                    </div>
-                                )}
-                            </>
-                        ) : (
-                            <div className="flex justify-between text-sm">
-                                <span className="text-muted-foreground">
-                                    {hasItems ? "Base rate (no services selected)" : "Service price"}
-                                </span>
-                                <span className="font-semibold">₦{baseTotal.toLocaleString()}</span>
-                            </div>
-                        )}
+                        {/* Base rate — always shown */}
+                        <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">
+                                Base rate
+                                {hasItems && <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded ml-1.5 font-medium">always included</span>}
+                            </span>
+                            <span className="font-medium">₦{startingPrice.toLocaleString()}</span>
+                        </div>
 
-                        {/* Platform service fee line */}
+                        {/* Selected service items */}
+                        {hasItems && cart.size > 0 && Array.from(cart.values()).map((entry) => (
+                            <div key={entry.item.id} className="flex justify-between text-sm">
+                                <span className="text-muted-foreground">
+                                    {entry.item.name} × {entry.quantity}
+                                </span>
+                                <span className="font-medium">
+                                    ₦{(Number(entry.item.unit_price) * entry.quantity).toLocaleString()}
+                                </span>
+                            </div>
+                        ))}
+
+                        {/* Platform service fee */}
                         <div className="flex justify-between text-sm text-muted-foreground">
                             <span className="flex items-center gap-1">
                                 Platform service fee

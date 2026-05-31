@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +16,7 @@ import {
   LogOut, ArrowLeft, Loader2, CheckCircle2, Clock, XCircle,
   User, Settings, Star, ShieldCheck, RefreshCw, Camera, Upload,
   Image as ImageIcon, X, Utensils, Palette, Music, Truck,
-  Plus, Pencil, Trash2, Package, ToggleLeft, ToggleRight
+  Plus, Pencil, Trash2, Package, ToggleLeft, ToggleRight, AlertTriangle
 } from "lucide-react";
 
 const categoryIconMap: Record<string, React.ElementType> = {
@@ -30,7 +30,7 @@ const categoryIconMap: Record<string, React.ElementType> = {
 
 const getCategoryIcon = (category: string): React.ElementType =>
   categoryIconMap[category] || Building2;
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
@@ -38,10 +38,30 @@ import { toast } from "sonner";
 const VendorProfile = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Scroll to section when navigated via hash (e.g. /profile#payouts)
+  useEffect(() => {
+    if (location.hash) {
+      const el = document.getElementById(location.hash.slice(1));
+      if (el) {
+        setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "start" }), 300);
+      }
+    }
+  }, [location.hash]);
+
   const queryClient = useQueryClient();
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingBank, setIsSavingBank] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [bankCode, setBankCode] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
+  const [resolvedName, setResolvedName] = useState<string | null>(null);
+  const [isResolving, setIsResolving] = useState(false);
+  const [resolveError, setResolveError] = useState<string | null>(null);
+
+  // Digital banks that Paystack's /bank/resolve doesn't support via NIBSS
+  const UNRESOLVABLE_BANKS = new Set(["100004", "999992", "999991", "090110", "090267", "565"]);
   const [isUploadingProfile, setIsUploadingProfile] = useState(false);
   const [isUploadingGallery, setIsUploadingGallery] = useState(false);
   const profileImageInputRef = useRef<HTMLInputElement>(null);
@@ -69,6 +89,47 @@ const VendorProfile = () => {
     queryFn: () => api.serviceItems.getMine(),
     enabled: !!vendor,
   });
+
+  // Sync bank state when vendor profile loads
+  useEffect(() => {
+    if (vendor) {
+      setBankCode(vendor.bank_code || "");
+      setAccountNumber(vendor.account_number || "");
+    }
+  }, [vendor?.id]);
+
+  // Auto-resolve account name when 10-digit account + bank code are set
+  useEffect(() => {
+    if (accountNumber.length !== 10 || !bankCode) {
+      setResolvedName(null);
+      setResolveError(null);
+      return;
+    }
+    // Digital banks (OPay, Kuda, PalmPay, etc.) don't support NIBSS resolution
+    if (UNRESOLVABLE_BANKS.has(bankCode)) {
+      setResolvedName(null);
+      setResolveError(null);
+      return;
+    }
+    let cancelled = false;
+    setIsResolving(true);
+    setResolvedName(null);
+    setResolveError(null);
+    api.vendors.resolveAccount(accountNumber, bankCode)
+      .then((data) => {
+        if (!cancelled) {
+          setResolvedName(data.account_name);
+          setIsResolving(false);
+        }
+      })
+      .catch((err: any) => {
+        if (!cancelled) {
+          setResolveError(err.response?.data?.detail || "Could not verify this account. Please check your details.");
+          setIsResolving(false);
+        }
+      });
+    return () => { cancelled = true; };
+  }, [accountNumber, bankCode]);
 
   const createItemMutation = useMutation({
     mutationFn: (data: any) => api.serviceItems.create(data),
@@ -165,16 +226,13 @@ const VendorProfile = () => {
 
   const handleBankSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const fd = new FormData(e.currentTarget);
-    const account_number = fd.get("account_number") as string;
-    const bank_code = fd.get("bank_code") as string;
-    if (!account_number || !bank_code) {
+    if (!accountNumber || !bankCode) {
       toast.error("Please fill in all bank details");
       return;
     }
     setIsSavingBank(true);
     try {
-      await api.vendors.updateMyVendor({ account_number, bank_code });
+      await api.vendors.updateMyVendor({ account_number: accountNumber, bank_code: bankCode });
       toast.success("Bank details saved!");
       queryClient.invalidateQueries({ queryKey: ["vendor-profile"] });
     } catch (error: any) {
@@ -428,11 +486,12 @@ const VendorProfile = () => {
                         </div>
                       </div>
                       <div>
-                        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5 block">Starting Price (₦)</label>
+                        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5 block">Base Rate (₦)</label>
                         <div className="relative">
                           <Banknote className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                           <Input name="starting_price" type="number" defaultValue={vendor.starting_price} placeholder="50000" className="pl-9 text-sm h-10" />
                         </div>
+                        <p className="text-[11px] text-muted-foreground mt-1">Charged on every booking. Add-on services are priced separately below.</p>
                       </div>
                     </div>
                     <div>
@@ -566,7 +625,7 @@ const VendorProfile = () => {
                 </div>
 
                 {/* Service Items */}
-                <div className="bg-white border border-border rounded-2xl p-6 lg:col-span-2">
+                <div id="services" className="bg-white border border-border rounded-2xl p-6 lg:col-span-2 scroll-mt-28">
                   <div className="flex items-center justify-between mb-5">
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 bg-accent/10 rounded-lg flex items-center justify-center">
@@ -656,10 +715,23 @@ const VendorProfile = () => {
                       <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                     </div>
                   ) : serviceItems.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground border-2 border-dashed border-border rounded-xl">
-                      <Package className="h-8 w-8 mx-auto mb-2 text-muted-foreground/30" />
-                      <p className="text-sm font-medium">No service items yet</p>
-                      <p className="text-xs mt-1">Add items so customers can select exactly what they need.</p>
+                    <div className="rounded-xl border-2 border-dashed border-primary/20 bg-primary/5 p-6 text-center">
+                      <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-3">
+                        <Package className="h-6 w-6 text-primary" />
+                      </div>
+                      <p className="text-sm font-bold text-foreground mb-1">No service items yet</p>
+                      <p className="text-xs text-muted-foreground mb-4 max-w-xs mx-auto leading-relaxed">
+                        Add your menu, packages, or individual services with pricing. Customers pick what they want when booking — you get paid based on their selection plus your base rate.
+                      </p>
+                      <div className="flex flex-wrap justify-center gap-2 mb-4">
+                        {["Rice ₦100k", "DJ Set ₦150k/hr", "Cocktails ₦3k/person", "Floral setup ₦50k"].map(ex => (
+                          <span key={ex} className="text-[11px] bg-white border border-border px-2.5 py-1 rounded-full text-muted-foreground">{ex}</span>
+                        ))}
+                      </div>
+                      <Button size="sm" onClick={() => setShowAddItem(true)} className="gap-1.5">
+                        <Plus className="h-3.5 w-3.5" />
+                        Add your first service
+                      </Button>
                     </div>
                   ) : (
                     <div className="divide-y divide-border border border-border rounded-xl overflow-hidden">
@@ -715,7 +787,7 @@ const VendorProfile = () => {
                 </div>
 
                 {/* Payout Settings */}
-                <div className="bg-white border border-border rounded-2xl p-6 lg:col-span-2">
+                <div id="payouts" className="bg-white border border-border rounded-2xl p-6 lg:col-span-2 scroll-mt-28">
                   <div className="flex items-center gap-2 mb-5">
                     <div className="w-8 h-8 bg-secondary/20 rounded-lg flex items-center justify-center">
                       <Banknote className="h-4 w-4 text-secondary-foreground" />
@@ -726,47 +798,116 @@ const VendorProfile = () => {
                     </div>
                   </div>
 
-                  <form onSubmit={handleBankSubmit} className="grid sm:grid-cols-3 gap-4 items-end">
-                    <div>
-                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5 block">Bank Name</label>
-                      <select
-                        name="bank_code"
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                        defaultValue={vendor.bank_code || ""}
-                      >
-                        <option value="">Select Bank</option>
-                        <option value="044">Access Bank</option>
-                        <option value="058">Guaranty Trust Bank</option>
-                        <option value="033">United Bank for Africa</option>
-                        <option value="057">Zenith Bank</option>
-                        <option value="011">First Bank of Nigeria</option>
-                        <option value="076">Polaris Bank</option>
-                        <option value="221">Stanbic IBTC Bank</option>
-                        <option value="232">Sterling Bank</option>
-                      </select>
+                  {!vendor.bank_code && !vendor.account_number && (
+                    <div className="mb-4 flex items-start gap-2.5 bg-orange-500/5 border border-orange-500/20 rounded-xl px-4 py-3">
+                      <AlertTriangle className="h-4 w-4 text-orange-500 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs font-semibold text-orange-700">Payouts not set up</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Add your bank details so we can pay you when bookings complete. Without this, funds cannot be transferred to you.
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5 block">Account Number</label>
-                      <Input
-                        type="text"
-                        name="account_number"
-                        placeholder="0123456789"
-                        defaultValue={vendor.account_number || ""}
-                        maxLength={10}
-                        className="h-10 text-sm"
-                      />
+                  )}
+
+                  <form onSubmit={handleBankSubmit} className="space-y-4">
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5 block">Bank Name</label>
+                        <select
+                          value={bankCode}
+                          onChange={(e) => setBankCode(e.target.value)}
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        >
+                          <option value="">Select Bank</option>
+                          <optgroup label="Commercial Banks">
+                            <option value="044">Access Bank</option>
+                            <option value="063">Access Bank (Diamond)</option>
+                            <option value="035A">ALAT by Wema</option>
+                            <option value="050">Ecobank Nigeria</option>
+                            <option value="070">Fidelity Bank</option>
+                            <option value="011">First Bank of Nigeria</option>
+                            <option value="214">First City Monument Bank</option>
+                            <option value="058">Guaranty Trust Bank</option>
+                            <option value="030">Heritage Bank</option>
+                            <option value="301">Jaiz Bank</option>
+                            <option value="082">Keystone Bank</option>
+                            <option value="076">Polaris Bank</option>
+                            <option value="101">Providus Bank</option>
+                            <option value="221">Stanbic IBTC Bank</option>
+                            <option value="068">Standard Chartered Bank</option>
+                            <option value="232">Sterling Bank</option>
+                            <option value="100">SunTrust Bank</option>
+                            <option value="032">Union Bank of Nigeria</option>
+                            <option value="033">United Bank for Africa</option>
+                            <option value="215">Unity Bank</option>
+                            <option value="035">Wema Bank</option>
+                            <option value="057">Zenith Bank</option>
+                          </optgroup>
+                          <optgroup label="Digital Banks &amp; Fintechs">
+                            <option value="100004">Kuda Bank</option>
+                            <option value="999992">OPay</option>
+                            <option value="999991">PalmPay</option>
+                            <option value="090110">VFD Microfinance Bank</option>
+                            <option value="090267">Moniepoint MFB</option>
+                            <option value="565">Carbon</option>
+                          </optgroup>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5 block">Account Number</label>
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="0123456789"
+                          value={accountNumber}
+                          onChange={(e) => setAccountNumber(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                          maxLength={10}
+                          className="h-10 text-sm"
+                        />
+                        <p className="text-[11px] text-muted-foreground mt-1">{accountNumber.length}/10 digits</p>
+                      </div>
                     </div>
-                    <Button type="submit" variant="outline" className="h-10 font-semibold" disabled={isSavingBank}>
+
+                    {/* Account name preview */}
+                    {isResolving && (
+                      <div className="flex items-center gap-2.5 text-sm text-muted-foreground bg-muted/40 border border-border rounded-xl px-4 py-3">
+                        <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
+                        Verifying account with your bank…
+                      </div>
+                    )}
+                    {resolvedName && !isResolving && (
+                      <div className="flex items-center gap-2.5 bg-green-500/8 border border-green-500/25 rounded-xl px-4 py-3">
+                        <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
+                        <div>
+                          <p className="text-xs text-green-700 font-semibold">{resolvedName}</p>
+                          <p className="text-[11px] text-green-600/80 mt-0.5">Account confirmed — save to enable payouts</p>
+                        </div>
+                      </div>
+                    )}
+                    {accountNumber.length === 10 && bankCode && UNRESOLVABLE_BANKS.has(bankCode) && !isResolving && (
+                      <div className="flex items-start gap-2.5 bg-primary/5 border border-primary/20 rounded-xl px-4 py-3">
+                        <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-xs text-primary font-semibold">Details look good</p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">This bank doesn't support instant name verification — your details will be confirmed when processing your first payout.</p>
+                        </div>
+                      </div>
+                    )}
+                    {resolveError && !isResolving && (
+                      <div className="flex items-start gap-2.5 bg-orange-500/5 border border-orange-500/20 rounded-xl px-4 py-3">
+                        <AlertTriangle className="h-4 w-4 text-orange-500 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-xs text-orange-700 font-semibold">Couldn't auto-verify</p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">{resolveError} Double-check your details are correct — you can still save and we'll confirm at payout time.</p>
+                        </div>
+                      </div>
+                    )}
+
+                    <Button type="submit" variant="outline" className="h-10 font-semibold" disabled={isSavingBank || isResolving}>
                       {isSavingBank ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Bank Details"}
                     </Button>
                   </form>
-
-                  {vendor.bank_code && vendor.account_number && (
-                    <div className="mt-4 flex items-center gap-2 text-xs text-green-700 bg-green-500/8 border border-green-500/20 px-3 py-2 rounded-lg w-fit">
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      Bank details saved — payouts are enabled
-                    </div>
-                  )}
                 </div>
               </div>
             </div>

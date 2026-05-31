@@ -148,6 +148,12 @@ export const api = {
       );
       return response.data;
     },
+    resolveAccount: async (account_number: string, bank_code: string) => {
+      const response = await apiClient.get("/api/vendors/me/resolve-account", {
+        params: { account_number, bank_code },
+      });
+      return response.data as { account_name: string; account_number: string };
+    },
     list: async (params?: {
       category?: string;
       location?: string;

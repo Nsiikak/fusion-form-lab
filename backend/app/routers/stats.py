@@ -70,9 +70,11 @@ async def get_vendor_stats(
         Booking.status.in_([BookingStatus.PENDING, BookingStatus.CONFIRMED])
     ).count()
 
+    # Only count released payouts — COMPLETED means customer confirmed or 24h auto-release fired
     total_earnings = db.query(func.coalesce(func.sum(Booking.price), 0)).filter(
         Booking.vendor_id == vendor.id,
-        Booking.status.in_([BookingStatus.CONFIRMED, BookingStatus.COMPLETED]),
+        Booking.status == BookingStatus.COMPLETED,
+        Booking.paid_out == True,  # noqa: E712
     ).scalar() or 0
 
     unique_customers = db.query(func.count(distinct(Booking.customer_id))).filter(

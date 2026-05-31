@@ -1,37 +1,40 @@
 import { Link } from "react-router-dom";
 import { Twitter, Instagram, Linkedin, Facebook } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
-const columns = [
-  {
-    title: "Platform",
-    links: [
-      { label: "Browse Vendors", to: "/vendor-search" },
-      { label: "Plan an Event", to: "/register" },
-      { label: "How It Works", to: "/#how-it-works" },
-      { label: "Pricing", to: "/#" },
-    ],
-  },
-  {
-    title: "Vendors",
-    links: [
-      { label: "Register", to: "/vendor-registration" },
-      { label: "Verification", to: "/#vendors" },
-      { label: "Vendor Dashboard", to: "/vendor-dashboard" },
-      { label: "Success Stories", to: "/#testimonials" },
-    ],
-  },
-  {
-    title: "Company",
-    links: [
-      { label: "About Plagohive", to: "/#" },
-      { label: "Blog", to: "/#" },
-      { label: "Privacy Policy", to: "/#" },
-      { label: "Contact Us", to: "/#" },
-    ],
-  },
+const platformLinks = [
+  { label: "Browse Vendors", to: "/vendor-search" },
+  { label: "Plan an Event", to: "/register" },
+  { label: "How It Works", to: "/#how-it-works" },
+  { label: "Pricing", to: "/#" },
+];
+
+const vendorLinks = [
+  { label: "Register", to: "/vendor-registration", guestOnly: true },
+  { label: "Verification", to: "/#vendors" },
+  { label: "Vendor Dashboard", to: "/vendor-dashboard" },
+  { label: "Success Stories", to: "/#testimonials" },
+];
+
+const companyLinks = [
+  { label: "About Plagohive", to: "/#" },
+  { label: "Blog", to: "/#" },
+  { label: "Privacy Policy", to: "/#" },
+  { label: "Contact Us", to: "/#" },
 ];
 
 export const Footer = () => {
+  const { isAuthenticated } = useAuth();
+
+  const columns = [
+    { title: "Platform", links: platformLinks },
+    {
+      title: "Vendors",
+      links: vendorLinks.filter((l) => !l.guestOnly || !isAuthenticated),
+    },
+    { title: "Company", links: companyLinks },
+  ];
+
   return (
     <footer className="bg-foreground pt-[72px] pb-9 px-[5vw]">
       <div className="max-w-[1200px] mx-auto">

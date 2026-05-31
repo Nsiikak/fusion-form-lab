@@ -207,11 +207,20 @@ const VendorDetails = () => {
                                 <h2 className="text-2xl font-bold mb-4">Services & Pricing</h2>
                                 {(serviceItems as any[]).length > 0 ? (
                                     <Card className="bg-white border border-border shadow-sm overflow-hidden">
-                                        <div className="px-6 pt-5 pb-3 border-b border-border">
-                                            <p className="text-sm text-muted-foreground">
-                                                Starting from{" "}
-                                                <span className="font-semibold text-foreground">₦{Number(vendor.starting_price).toLocaleString()}</span>
-                                            </p>
+                                        {/* Base rate row — always at the top */}
+                                        <div className="flex items-center justify-between px-6 py-4 bg-primary/5 border-b border-border">
+                                            <div>
+                                                <p className="text-sm font-semibold text-foreground">Base Rate</p>
+                                                <p className="text-xs text-muted-foreground">Always included with every booking</p>
+                                            </div>
+                                            <span className="text-sm font-bold text-primary">
+                                                ₦{Number(vendor.starting_price).toLocaleString()}
+                                            </span>
+                                        </div>
+
+                                        {/* Add-on service items */}
+                                        <div className="px-6 py-2 border-b border-border bg-muted/30">
+                                            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Add-on Services</p>
                                         </div>
                                         <div className="divide-y divide-border">
                                             {(serviceItems as any[]).map((item: any) => (
@@ -234,7 +243,7 @@ const VendorDetails = () => {
                                         <div className="px-6 py-4 bg-muted/30 border-t border-border">
                                             <p className="text-xs text-muted-foreground flex items-center gap-1.5">
                                                 <CheckCircle2 className="h-3.5 w-3.5 text-green-500 flex-shrink-0" />
-                                                Select quantities when booking to get an exact price
+                                                Your total = base rate + the services you select when booking
                                             </p>
                                         </div>
                                     </Card>
@@ -242,8 +251,8 @@ const VendorDetails = () => {
                                     <Card className="p-6 bg-white border border-border shadow-sm">
                                         <div className="flex items-center justify-between mb-4">
                                             <div>
-                                                <h3 className="font-semibold text-lg">Standard Service Package</h3>
-                                                <p className="text-sm text-muted-foreground">Starting price for base services</p>
+                                                <h3 className="font-semibold text-lg">Fixed Rate Service</h3>
+                                                <p className="text-sm text-muted-foreground">Flat fee — price covers the full service</p>
                                             </div>
                                             <span className="text-2xl font-bold text-primary">₦{Number(vendor.starting_price).toLocaleString()}</span>
                                         </div>
@@ -317,15 +326,18 @@ const VendorDetails = () => {
                         <div className="space-y-6">
                             <Card className="p-6 bg-white border border-border shadow-sm sticky top-24">
                                 <h3 className="font-bold text-lg mb-4">Book this Vendor</h3>
-                                <div className="space-y-4 mb-6">
+                                <div className="space-y-3 mb-6">
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-muted-foreground">Starting Price</span>
-                                        <span className="font-semibold">₦{vendor.starting_price.toLocaleString()}</span>
+                                        <span className="text-muted-foreground">Base rate</span>
+                                        <span className="font-semibold">₦{Number(vendor.starting_price).toLocaleString()}</span>
                                     </div>
                                     <div className="flex justify-between text-sm">
                                         <span className="text-muted-foreground">Response Time</span>
                                         <span className="font-semibold">~24 hours</span>
                                     </div>
+                                    <p className="text-[11px] text-muted-foreground bg-muted/50 rounded-lg px-3 py-2 leading-relaxed">
+                                        Base rate is always charged. Additional services you select are added on top.
+                                    </p>
                                 </div>
                                 <Button className="w-full shadow-lg" size="lg" onClick={handleBookClick}>
                                     Request Booking

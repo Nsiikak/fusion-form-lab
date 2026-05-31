@@ -131,7 +131,8 @@ class BookingService:
                     "quantity": order.quantity,
                     "subtotal": subtotal,
                 })
-            computed_price = total
+            # Base rate is always additive — items are on top of the engagement fee
+            computed_price = float(vendor.starting_price) + total
 
         # Server-side price validation — client cannot set an arbitrary price
         if computed_price < float(vendor.starting_price):
@@ -235,7 +236,7 @@ class BookingService:
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=(
                         "Cannot mark complete before the event date "
-                        f"({event_dt.strftime('%d %b %Y, %H:%M UTC')})"
+                        f"({event_dt.strftime('%d %b %Y')})"
                     ),
                 )
 
