@@ -217,72 +217,73 @@ const VendorDashboard = () => {
             </div>
           </div>
 
-          {/* CAC Verification Banner */}
-          {vendorProfile && vendorProfile.verification_status !== "approved" && (
-            <div className={`mb-8 rounded-2xl border px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
-              vendorProfile.cac_verification_attempted
-                ? "bg-orange-500/5 border-orange-500/20"
-                : "bg-primary/5 border-primary/20"
-            }`}>
-              <div className="flex items-start gap-3">
-                {vendorProfile.cac_verification_attempted ? (
+          {/* CAC Verification Banner — three distinct states */}
+          {vendorProfile && vendorProfile.verification_status !== "approved" && (() => {
+            const attempted = vendorProfile.cac_verification_attempted;
+            const hasNameMatch = !!vendorProfile.cac_verified_name;
+
+            if (!attempted) {
+              return (
+                <div className="mb-8 rounded-2xl border border-primary/20 bg-primary/5 px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <ShieldCheck className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Complete your verification</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Add your CAC RC number in your profile to get verified instantly and unlock full platform access.</p>
+                    </div>
+                  </div>
+                  <Link to="/profile" className="flex-shrink-0">
+                    <Button size="sm" className="text-xs h-8">Add RC Number</Button>
+                  </Link>
+                </div>
+              );
+            }
+
+            if (attempted && hasNameMatch) {
+              return (
+                <div className="mb-8 rounded-2xl border border-yellow-300 bg-yellow-50 px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <Info className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Under manual review</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        CAC record found as <span className="font-medium text-foreground">"{vendorProfile.cac_verified_name}"</span>. Our team is reviewing the name difference — no action needed from you.
+                      </p>
+                    </div>
+                  </div>
+                  <span className="flex-shrink-0 text-xs font-medium text-yellow-700 bg-yellow-100 border border-yellow-200 px-3 py-1.5 rounded-full">Review in progress</span>
+                </div>
+              );
+            }
+
+            return (
+              <div className="mb-8 rounded-2xl border border-orange-200 bg-orange-50 px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-start gap-3">
                   <AlertTriangle className="h-5 w-5 text-orange-500 flex-shrink-0 mt-0.5" />
-                ) : (
-                  <ShieldCheck className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
-                )}
-                <div>
-                  <p className="text-sm font-semibold text-foreground">
-                    {vendorProfile.cac_verification_attempted
-                      ? "Verification pending manual review"
-                      : "Your account is pending verification"}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {vendorProfile.cac_verification_attempted
-                      ? vendorProfile.cac_verified_name
-                        ? `CAC record found: "${vendorProfile.cac_verified_name}". Name mismatch — our team is reviewing.`
-                        : "RC number not matched in CAC. Update your profile with the correct RC number and retry."
-                      : "Add your CAC RC number in your profile and run verification to get approved instantly."}
-                  </p>
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">RC number not found</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">We couldn't match your RC number in the CAC database. Please check it's correct, update your profile, then retry.</p>
+                  </div>
+                </div>
+                <div className="flex gap-2 flex-shrink-0">
+                  <Link to="/profile">
+                    <Button size="sm" variant="outline" className="text-xs h-8">Update RC Number</Button>
+                  </Link>
+                  {vendorProfile.registration_number && (
+                    <Button size="sm" className="text-xs h-8" disabled={reVerifyMutation.isPending} onClick={() => reVerifyMutation.mutate()}>
+                      {reVerifyMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><RefreshCw className="h-3.5 w-3.5 mr-1.5" />Retry</>}
+                    </Button>
+                  )}
                 </div>
               </div>
-              <div className="flex gap-2 flex-shrink-0">
-                {vendorProfile.registration_number && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="text-xs h-8 border-primary/30 hover:bg-primary/5"
-                    disabled={reVerifyMutation.isPending}
-                    onClick={() => reVerifyMutation.mutate()}
-                  >
-                    {reVerifyMutation.isPending ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <><RefreshCw className="h-3.5 w-3.5 mr-1.5" />Re-verify</>
-                    )}
-                  </Button>
-                )}
-                <Link to="/profile">
-                  <Button size="sm" className="text-xs h-8">
-                    {vendorProfile.registration_number ? "Update Profile" : "Add RC Number"}
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Setup Checklist — shown until all steps complete */}
           {vendorProfile && (() => {
             const hasBankDetails = !!(vendorProfile.account_number);
             const hasServiceItems = (myServiceItems as any[]).length > 0;
             const steps = [
-              {
-                id: "account",
-                label: "Vendor account created",
-                desc: "You're registered and listed on Plagohive",
-                done: true,
-                cta: null as string | null,
-                action: null as (() => void) | null,
-              },
               {
                 id: "services",
                 label: "Add your service items & pricing",
@@ -733,11 +734,31 @@ const VendorDashboard = () => {
                     >
                       <option value="">Select Bank</option>
                       <option value="044">Access Bank</option>
-                      <option value="058">Guaranty Trust Bank</option>
-                      <option value="033">United Bank for Africa</option>
-                      <option value="057">Zenith Bank</option>
+                      <option value="023">Citibank Nigeria</option>
+                      <option value="050">Ecobank Nigeria</option>
+                      <option value="070">Fidelity Bank</option>
+                      <option value="214">First City Monument Bank (FCMB)</option>
                       <option value="011">First Bank of Nigeria</option>
-                      {/* Short list for demo, ideally fetched from Paystack API */}
+                      <option value="058">Guaranty Trust Bank (GTB)</option>
+                      <option value="030">Heritage Bank</option>
+                      <option value="301">Jaiz Bank</option>
+                      <option value="082">Keystone Bank</option>
+                      <option value="50211">Kuda Bank</option>
+                      <option value="50515">Moniepoint MFB</option>
+                      <option value="999992">OPay</option>
+                      <option value="999991">PalmPay</option>
+                      <option value="076">Polaris Bank</option>
+                      <option value="526">Parallex Bank</option>
+                      <option value="101">ProvidusBank</option>
+                      <option value="221">Stanbic IBTC Bank</option>
+                      <option value="068">Standard Chartered Bank</option>
+                      <option value="232">Sterling Bank</option>
+                      <option value="100">SunTrust Bank</option>
+                      <option value="032">Union Bank of Nigeria</option>
+                      <option value="033">United Bank for Africa (UBA)</option>
+                      <option value="215">Unity Bank</option>
+                      <option value="035">Wema Bank</option>
+                      <option value="057">Zenith Bank</option>
                     </select>
                   </div>
 
@@ -769,7 +790,7 @@ const VendorDashboard = () => {
                 </div>
                 <Badge className="bg-primary/10 text-primary border border-primary/20 text-xs px-3 py-1.5 w-fit">
                   <Sparkles className="h-3 w-3 mr-1.5" />
-                  Advanced analytics coming soon
+                  Live data
                 </Badge>
               </div>
 

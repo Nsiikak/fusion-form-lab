@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
-import { Search, MapPin, Star, Filter, LogOut, Loader2, Utensils, Palette, Camera, Music, Truck, Building2, Store, CheckCircle2 } from "lucide-react";
+import { Search, MapPin, Star, Filter, LogOut, Utensils, Palette, Camera, Music, Truck, Building2, Store, CheckCircle2, SearchX } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Footer } from "@/components/Footer";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
@@ -173,7 +174,7 @@ const VendorSearch = () => {
 
             <div className="space-y-4">
               <div>
-                <label className="text-sm font-medium mb-2 block">Budget: ₦{budget[0].toLocaleString()}</label>
+                <label className="text-sm font-medium mb-2 block">Show vendors starting under ₦{budget[0].toLocaleString()}</label>
                 <Slider
                   value={budget}
                   onValueChange={setBudget}
@@ -216,12 +217,45 @@ const VendorSearch = () => {
           </div>
 
           {isLoading ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Card key={i} className="overflow-hidden">
+                  <Skeleton className="aspect-video w-full" />
+                  <div className="p-6 space-y-3">
+                    <Skeleton className="h-5 w-3/4" />
+                    <Skeleton className="h-4 w-1/2" />
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-5/6" />
+                    <div className="flex justify-between items-center pt-2">
+                      <Skeleton className="h-6 w-24" />
+                      <Skeleton className="h-9 w-28 rounded-md" />
+                    </div>
+                  </div>
+                </Card>
+              ))}
             </div>
           ) : vendors.length === 0 ? (
-            <div className="text-center py-20">
-              <p className="text-muted-foreground text-lg">No vendors found. Try adjusting your filters.</p>
+            <div className="flex flex-col items-center justify-center py-24 text-center max-w-md mx-auto">
+              <div className="w-16 h-16 bg-muted rounded-2xl flex items-center justify-center mb-4">
+                <SearchX className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <h3 className="text-xl font-bold mb-2">No vendors found</h3>
+              <p className="text-muted-foreground mb-6 text-sm leading-relaxed">
+                Try broadening your search — remove a category filter, increase your budget, or clear the search text.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => { setSelectedCategory("All Categories"); setBudget([300000]); setSearchInput(""); }}
+                >
+                  Clear all filters
+                </Button>
+                <Link to="/vendor-registration">
+                  <Button variant="ghost" className="text-primary hover:text-primary">
+                    Can't find what you need? Join as a vendor →
+                  </Button>
+                </Link>
+              </div>
             </div>
           ) : (
             <>

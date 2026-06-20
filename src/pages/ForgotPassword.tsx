@@ -43,7 +43,7 @@ const ForgotPassword = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0D1B2A] flex flex-col items-center justify-center p-6">
+    <div className="min-h-screen bg-primary flex flex-col items-center justify-center p-6">
       <div className="w-full max-w-[420px]">
         {/* Logo */}
         <Link to="/" className="flex justify-center mb-10">

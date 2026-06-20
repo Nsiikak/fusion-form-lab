@@ -48,7 +48,6 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import BookingModal from "@/components/BookingModal";
-import { AspectRatio } from "@/components/ui/aspect-ratio";
 
 const VendorDetails = () => {
     const { id } = useParams();
@@ -58,6 +57,18 @@ const VendorDetails = () => {
     const { user, isAuthenticated } = useAuth();
     const [isBookingOpen, setIsBookingOpen] = useState(false);
     const [isAuthPromptOpen, setIsAuthPromptOpen] = useState(false);
+
+    const handleShare = async () => {
+        const url = window.location.href;
+        if (navigator.share) {
+            try {
+                await navigator.share({ title: vendor?.business_name, url });
+            } catch { /* user cancelled */ }
+        } else {
+            await navigator.clipboard.writeText(url);
+            toast.success("Link copied to clipboard!");
+        }
+    };
 
     const { data: vendor, isLoading } = useQuery({
         queryKey: ["vendor", id],
@@ -185,7 +196,7 @@ const VendorDetails = () => {
                             </div>
 
                             <div className="flex gap-3">
-                                <Button variant="outline">
+                                <Button variant="outline" onClick={handleShare}>
                                     <Share2 className="h-4 w-4 mr-2" /> Share
                                 </Button>
                                 <Button size="lg" className="shadow-lg hover:shadow-primary/30" onClick={handleBookClick}>
@@ -340,8 +351,8 @@ const VendorDetails = () => {
                                         <span className="font-semibold">₦{Number(vendor.starting_price).toLocaleString()}</span>
                                     </div>
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-muted-foreground">Response Time</span>
-                                        <span className="font-semibold">~24 hours</span>
+                                        <span className="text-muted-foreground">Bookings</span>
+                                        <span className="font-semibold">{reviews.length > 0 ? `${reviews.length} completed` : "Be the first"}</span>
                                     </div>
                                     <p className="text-[11px] text-muted-foreground bg-muted/50 rounded-lg px-3 py-2 leading-relaxed">
                                         Base rate is always charged. Additional services you select are added on top.

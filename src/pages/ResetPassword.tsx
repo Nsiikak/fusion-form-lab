@@ -46,7 +46,7 @@ const ResetPassword = () => {
 
   if (!token) {
     return (
-      <div className="min-h-screen bg-[#0D1B2A] flex items-center justify-center p-6">
+      <div className="min-h-screen bg-primary flex items-center justify-center p-6">
         <div className="bg-white rounded-2xl p-8 max-w-sm w-full text-center">
           <h2 className="text-xl font-bold mb-3">Invalid reset link</h2>
           <p className="text-muted-foreground text-sm mb-6">
@@ -72,7 +72,7 @@ const ResetPassword = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0D1B2A] flex flex-col items-center justify-center p-6">
+    <div className="min-h-screen bg-primary flex flex-col items-center justify-center p-6">
       <div className="w-full max-w-[420px]">
         <Link to="/" className="flex justify-center mb-10">
           <img

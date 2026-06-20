@@ -400,7 +400,7 @@ const BookingModal = ({ isOpen, onClose, vendor, eventId }: BookingModalProps) =
                         </div>
                         <p className="text-xs text-muted-foreground flex items-center gap-1">
                             <CheckCircle2 className="h-3 w-3 text-green-500" />
-                            Secure payment via Paystack · fee included
+                            Secured by Paystack · funds held in escrow until event completion
                         </p>
                     </div>
 

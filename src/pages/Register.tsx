@@ -49,6 +49,8 @@ const Register = () => {
   const { register: registerUser, isLoading } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [pwValue, setPwValue] = useState("");
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
@@ -260,67 +262,91 @@ const Register = () => {
                   )}
                 />
 
-                <div className="grid grid-cols-2 gap-3">
-                  <FormField
-                    control={form.control}
-                    name="password"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm font-semibold text-foreground">Password</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <Input
-                              type={showPassword ? "text" : "password"}
-                              placeholder="Min 6 chars"
-                              className="h-12 rounded-xl border-border/80 focus-visible:ring-primary/30 text-[15px] px-4 pr-11"
-                              {...field}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setShowPassword((v) => !v)}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                              tabIndex={-1}
-                              aria-label={showPassword ? "Hide password" : "Show password"}
-                            >
-                              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                            </button>
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-semibold text-foreground">Password</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <Input
+                            type={showPassword ? "text" : "password"}
+                            placeholder="Min 8 chars, with number & symbol"
+                            className="h-12 rounded-xl border-border/80 focus-visible:ring-primary/30 text-[15px] px-4 pr-11"
+                            {...field}
+                            onChange={(e) => { field.onChange(e); setPwValue(e.target.value); }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword((v) => !v)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                            aria-label={showPassword ? "Hide password" : "Show password"}
+                          >
+                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                        </div>
+                      </FormControl>
+                      {/* Live strength indicator */}
+                      {pwValue && (() => {
+                        const checks = [
+                          pwValue.length >= 8,
+                          /[A-Za-z]/.test(pwValue),
+                          /[0-9]/.test(pwValue),
+                          /[^A-Za-z0-9]/.test(pwValue),
+                        ];
+                        const passed = checks.filter(Boolean).length;
+                        const colors = ["bg-destructive", "bg-orange-400", "bg-yellow-400", "bg-green-500"];
+                        const labels = ["Too weak", "Weak", "Fair", "Strong"];
+                        return (
+                          <div className="mt-1.5 space-y-1">
+                            <div className="flex gap-1">
+                              {checks.map((ok, i) => (
+                                <div key={i} className={`h-1 flex-1 rounded-full transition-colors ${i < passed ? colors[passed - 1] : "bg-muted"}`} />
+                              ))}
+                            </div>
+                            <div className="flex gap-3 text-[11px] text-muted-foreground">
+                              <span className={pwValue.length >= 8 ? "text-green-600" : ""}>8+ chars</span>
+                              <span className={/[0-9]/.test(pwValue) ? "text-green-600" : ""}>Number</span>
+                              <span className={/[^A-Za-z0-9]/.test(pwValue) ? "text-green-600" : ""}>Symbol</span>
+                              <span className={`ml-auto font-medium ${passed >= 3 ? "text-green-600" : "text-muted-foreground"}`}>{labels[passed - 1] ?? ""}</span>
+                            </div>
                           </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                        );
+                      })()}
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-                  <FormField
-                    control={form.control}
-                    name="confirmPassword"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-sm font-semibold text-foreground">Confirm</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <Input
-                              type={showPassword ? "text" : "password"}
-                              placeholder="Re-enter"
-                              className="h-12 rounded-xl border-border/80 focus-visible:ring-primary/30 text-[15px] px-4 pr-11"
-                              {...field}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setShowPassword((v) => !v)}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                              tabIndex={-1}
-                              aria-label={showPassword ? "Hide password" : "Show password"}
-                            >
-                              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                            </button>
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
+                <FormField
+                  control={form.control}
+                  name="confirmPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-semibold text-foreground">Confirm password</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <Input
+                            type={showConfirm ? "text" : "password"}
+                            placeholder="Re-enter your password"
+                            className="h-12 rounded-xl border-border/80 focus-visible:ring-primary/30 text-[15px] px-4 pr-11"
+                            {...field}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowConfirm((v) => !v)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                            aria-label={showConfirm ? "Hide password" : "Show password"}
+                          >
+                            {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <Button
                   type="submit"

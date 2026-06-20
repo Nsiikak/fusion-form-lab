@@ -354,7 +354,7 @@ const CustomerDashboard = () => {
                               {{
                                 pending: "Pending",
                                 confirmed: "Confirmed",
-                                awaiting_confirmation: "Action Required",
+                                awaiting_confirmation: "Confirm Completion",
                                 completed: "Completed",
                                 declined: "Declined",
                                 cancelled: "Cancelled",
@@ -629,7 +629,7 @@ const CustomerDashboard = () => {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label>Event Date <span className="text-destructive">*</span></Label>
-                    <Input type="date" value={newEventDate} onChange={(e) => setNewEventDate(e.target.value)} min={new Date().toISOString().split("T")[0]} />
+                    <Input type="date" value={newEventDate} onChange={(e) => setNewEventDate(e.target.value)} />
                   </div>
                   <div className="space-y-1.5">
                     <Label>Total Budget (₦)</Label>
