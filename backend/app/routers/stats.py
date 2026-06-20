@@ -25,11 +25,21 @@ async def get_customer_stats(
         )
 
     today = datetime.now().date()
-    upcoming_events = db.query(func.count(Event.id)).filter(
+    # Upcoming events: count distinct future-dated bookings that are active (pending/confirmed)
+    # Falls back to Events table count when events are created; bookings are the primary source
+    upcoming_bookings_count = db.query(func.count(Booking.id)).filter(
+        Booking.customer_id == current_user.id,
+        Booking.event_date >= datetime.now(timezone.utc),
+        Booking.status.in_([BookingStatus.CONFIRMED, BookingStatus.PENDING]),
+    ).scalar() or 0
+
+    formal_events_count = db.query(func.count(Event.id)).filter(
         Event.customer_id == current_user.id,
         Event.date >= today,
         Event.status != EventStatus.CANCELLED,
     ).scalar() or 0
+
+    upcoming_events = max(upcoming_bookings_count, formal_events_count)
 
     base = db.query(Booking).filter(Booking.customer_id == current_user.id)
     active_bookings = base.filter(

@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Search, MapPin, Star, Filter, LogOut, Loader2, Utensils, Palette, Camera, Music, Truck, Building2, Store, CheckCircle2 } from "lucide-react";
 import { Footer } from "@/components/Footer";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
@@ -31,6 +31,8 @@ const categoryMap: Record<string, string | null> = {
 const VendorSearch = () => {
   const { user, logout, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const eventId = searchParams.get("event_id");
   const [selectedCategory, setSelectedCategory] = useState("All Categories");
   const [budget, setBudget] = useState([300000]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -230,9 +232,9 @@ const VendorSearch = () => {
                     className="overflow-hidden hover:shadow-elevated transition-all duration-300 hover:-translate-y-1 cursor-pointer"
                   >
                     <div className="aspect-video bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center overflow-hidden">
-                      {(vendor.profile_image_url || vendor.gallery_images?.[0]) ? (
+                      {vendor.gallery_images?.[0] ? (
                         <img
-                          src={vendor.profile_image_url || vendor.gallery_images[0]}
+                          src={vendor.gallery_images[0]}
                           alt={vendor.business_name}
                           className="w-full h-full object-cover"
                         />
@@ -269,7 +271,7 @@ const VendorSearch = () => {
                             ₦{Number(vendor.starting_price).toLocaleString()}
                           </p>
                         </div>
-                        <Link to={`/vendors/${vendor.id}`}>
+                        <Link to={`/vendors/${vendor.id}${eventId ? `?event_id=${eventId}` : ""}`}>
                           <Button>View Details</Button>
                         </Link>
                       </div>

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -46,12 +46,15 @@ const getCategoryIcon = (category: string): React.ElementType =>
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 import BookingModal from "@/components/BookingModal";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 
 const VendorDetails = () => {
     const { id } = useParams();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const eventId = searchParams.get("event_id") ? Number(searchParams.get("event_id")) : undefined;
     const { user, isAuthenticated } = useAuth();
     const [isBookingOpen, setIsBookingOpen] = useState(false);
     const [isAuthPromptOpen, setIsAuthPromptOpen] = useState(false);
@@ -87,6 +90,10 @@ const VendorDetails = () => {
     const handleBookClick = () => {
         if (!isAuthenticated) {
             setIsAuthPromptOpen(true);
+            return;
+        }
+        if (user?.role === "vendor") {
+            toast.error("Vendor accounts cannot book other vendors. Please create a customer account to make bookings.");
             return;
         }
         setIsBookingOpen(true);
@@ -133,7 +140,8 @@ const VendorDetails = () => {
             <main className="pt-24 pb-16">
                 {/* Cover Section */}
                 {(() => {
-                    const coverImg = vendor.profile_image_url || vendor.gallery_images?.[0];
+                    // Cover banner uses gallery images only; profile avatar uses profile_image_url separately
+                    const coverImg = vendor.gallery_images?.[0] ?? null;
                     return (
                         <div className="relative h-[300px] md:h-[400px] bg-gradient-to-r from-primary/20 via-primary/10 to-accent/20">
                             {coverImg ? (
@@ -357,6 +365,7 @@ const VendorDetails = () => {
                 isOpen={isBookingOpen}
                 onClose={() => setIsBookingOpen(false)}
                 vendor={vendor}
+                eventId={eventId}
             />
 
             {/* Auth prompt modal for unauthenticated users */}

@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/form";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2, Eye, EyeOff } from "lucide-react";
 
 const registerSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -48,6 +48,7 @@ const Register = () => {
   const redirect = searchParams.get("redirect");
   const { register: registerUser, isLoading } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
@@ -267,12 +268,23 @@ const Register = () => {
                       <FormItem>
                         <FormLabel className="text-sm font-semibold text-foreground">Password</FormLabel>
                         <FormControl>
-                          <Input
-                            type="password"
-                            placeholder="Min 6 chars"
-                            className="h-12 rounded-xl border-border/80 focus-visible:ring-primary/30 text-[15px] px-4"
-                            {...field}
-                          />
+                          <div className="relative">
+                            <Input
+                              type={showPassword ? "text" : "password"}
+                              placeholder="Min 6 chars"
+                              className="h-12 rounded-xl border-border/80 focus-visible:ring-primary/30 text-[15px] px-4 pr-11"
+                              {...field}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowPassword((v) => !v)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                              tabIndex={-1}
+                              aria-label={showPassword ? "Hide password" : "Show password"}
+                            >
+                              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </button>
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -286,12 +298,23 @@ const Register = () => {
                       <FormItem>
                         <FormLabel className="text-sm font-semibold text-foreground">Confirm</FormLabel>
                         <FormControl>
-                          <Input
-                            type="password"
-                            placeholder="Re-enter"
-                            className="h-12 rounded-xl border-border/80 focus-visible:ring-primary/30 text-[15px] px-4"
-                            {...field}
-                          />
+                          <div className="relative">
+                            <Input
+                              type={showPassword ? "text" : "password"}
+                              placeholder="Re-enter"
+                              className="h-12 rounded-xl border-border/80 focus-visible:ring-primary/30 text-[15px] px-4 pr-11"
+                              {...field}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowPassword((v) => !v)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                              tabIndex={-1}
+                              aria-label={showPassword ? "Hide password" : "Show password"}
+                            >
+                              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </button>
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>

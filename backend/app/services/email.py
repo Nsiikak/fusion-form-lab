@@ -271,6 +271,72 @@ def send_completion_pending_to_customer(
     return _send(customer_email, f"Action required: Confirm your event with {vendor_name}", html)
 
 
+def send_cac_verification_email(
+    email: str,
+    full_name: str,
+    business_name: str,
+    verified: bool,
+    cac_verified_name: str | None = None,
+) -> bool:
+    """Notify vendor of their CAC verification outcome (both auto and manual)."""
+    first_name = (full_name or email).split()[0].capitalize()
+    dashboard_url = f"{FRONTEND_URL}/vendor-dashboard"
+
+    if verified:
+        subject = f"✅ CAC Verified — {business_name} is now Plagohive Verified"
+        status_block = f"""
+<p>Great news, {first_name}!</p>
+<p>Your business <strong>{business_name}</strong> has been automatically verified against the
+Corporate Affairs Commission (CAC) database.</p>
+{"<p>Matched CAC record: <strong>" + cac_verified_name + "</strong></p>" if cac_verified_name else ""}
+<h3>What this means:</h3>
+<ul>
+  <li>Your vendor profile is now <strong>Verified ✓</strong> and visible to customers.</li>
+  <li>You can start receiving booking requests immediately.</li>
+  <li>Add service items and bank details to complete your setup and receive payouts.</li>
+</ul>"""
+    elif cac_verified_name:
+        subject = f"CAC Verification Update — Manual Review Required"
+        status_block = f"""
+<p>Hi {first_name},</p>
+<p>We found your RC number in the CAC database, but there is a slight name mismatch between your
+registered name (<strong>{business_name}</strong>) and the CAC record
+(<strong>{cac_verified_name}</strong>).</p>
+<h3>What happens next:</h3>
+<ul>
+  <li>Our team will review your application manually within <strong>48 hours</strong>.</li>
+  <li>You will receive another email once your verification is updated.</li>
+  <li>If you believe this is an error, please update your business name to match the CAC record exactly.</li>
+</ul>"""
+    else:
+        subject = f"CAC Verification Update — Action Required"
+        status_block = f"""
+<p>Hi {first_name},</p>
+<p>We were unable to automatically verify your RC number for <strong>{business_name}</strong> in the
+CAC database.</p>
+<h3>What to do next:</h3>
+<ul>
+  <li>Double-check your RC Number is correct (format: RC1234567).</li>
+  <li>Update your profile if there is a typo, then click "Re-verify" on your dashboard.</li>
+  <li>Our team will also review your application manually within <strong>48 hours</strong>.</li>
+</ul>"""
+
+    html = f"""<!DOCTYPE html>
+<html><body style="font-family:sans-serif;color:#1a1a2e;max-width:600px;margin:0 auto;padding:20px">
+<div style="border-left:4px solid #6c47ff;padding-left:16px;margin-bottom:20px">
+  <h2 style="color:#6c47ff;margin:0">CAC Verification Update</h2>
+</div>
+{status_block}
+<p style="margin:24px 0">
+  <a href="{dashboard_url}" style="background:#6c47ff;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">
+    Go to Dashboard
+  </a>
+</p>
+<p style="color:#888;font-size:12px">Plagohive &copy; {datetime.now().year} &middot; Questions? Reply to this email.</p>
+</body></html>"""
+    return _send(email, subject, html)
+
+
 def send_review_request(
     customer_email: str,
     customer_name: str,

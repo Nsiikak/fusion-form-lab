@@ -38,6 +38,8 @@ import {
   Shield,
   Check,
   X,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
@@ -59,6 +61,14 @@ const step2Schema = z.object({
   starting_price: z.string().min(1, "Starting price is required").refine(
     (val) => !isNaN(Number(val)) && Number(val) > 0,
     "Must be a valid positive number"
+  ),
+  service_fee_percentage: z.string().optional().refine(
+    (val) => !val || (!isNaN(Number(val)) && Number(val) >= 0 && Number(val) <= 100),
+    "Must be between 0 and 100"
+  ),
+  logistics_fee: z.string().optional().refine(
+    (val) => !val || (!isNaN(Number(val)) && Number(val) >= 0),
+    "Must be a valid amount"
   ),
   business_size: z.enum(["small", "medium", "large"]),
 });
@@ -146,6 +156,7 @@ const VendorRegistration = () => {
   }, [isAuthenticated, user?.role]);
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [selectedPhotos, setSelectedPhotos] = useState<File[]>([]);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState<{
@@ -171,6 +182,8 @@ const VendorRegistration = () => {
     defaultValues: {
       description: "",
       starting_price: "",
+      service_fee_percentage: "",
+      logistics_fee: "",
       business_size: "small",
     },
   });
@@ -231,6 +244,8 @@ const VendorRegistration = () => {
         location: allData.location,
         description: allData.description,
         starting_price: Number(allData.starting_price),
+        service_fee_percentage: allData.service_fee_percentage ? Number(allData.service_fee_percentage) : undefined,
+        logistics_fee: allData.category === "logistics" && allData.logistics_fee ? Number(allData.logistics_fee) : undefined,
         business_size: allData.business_size,
         registration_number: allData.registration_number || undefined,
         phone_number: allData.phone_number,
@@ -498,16 +513,58 @@ const VendorRegistration = () => {
                           <FormControl>
                             <div className="relative">
                               <Banknote className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
-                              <Input type="number" placeholder="50000" className="pl-10 h-11 glass-input" {...field} />
+                              <Input type="number" placeholder="10000" className="pl-10 h-11 glass-input" {...field} />
                             </div>
                           </FormControl>
                           <p className="text-xs text-muted-foreground mt-1">
-                            Charged on every booking. Add-on services are priced separately from your dashboard.
+                            Your lowest-priced service or product. Used for discovery and budget-matching.
                           </p>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
+
+                    <FormField
+                      control={step2Form.control}
+                      name="service_fee_percentage"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Service Fee (%)</FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <span className="absolute left-3 top-3 text-sm font-medium text-muted-foreground">%</span>
+                              <Input type="number" min="0" max="100" step="0.5" placeholder="e.g. 10" className="pl-8 h-11 glass-input" {...field} />
+                            </div>
+                          </FormControl>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Applied to all orders on top of product prices. For standalone providers (DJ, MC) leave blank — your base rate is your service fee.
+                          </p>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {formData.step1?.category === "logistics" && (
+                      <FormField
+                        control={step2Form.control}
+                        name="logistics_fee"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Logistics / Delivery Fee (₦)</FormLabel>
+                            <FormControl>
+                              <div className="relative">
+                                <Banknote className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
+                                <Input type="number" placeholder="e.g. 15000" className="pl-10 h-11 glass-input" {...field} />
+                              </div>
+                            </FormControl>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Average fixed transport / delivery charge per booking.
+                            </p>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
 
                     <FormField
                       control={step2Form.control}
@@ -533,25 +590,26 @@ const VendorRegistration = () => {
                     />
                   </div>
 
-                  {/* Base rate explainer */}
+                  {/* Pricing explainer */}
                   <div className="rounded-xl border border-primary/15 bg-primary/5 p-4 space-y-3">
-                    <p className="text-xs font-bold text-primary uppercase tracking-widest">What is a base rate?</p>
+                    <p className="text-xs font-bold text-primary uppercase tracking-widest">Pricing Guide</p>
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      Your base rate is charged on <span className="font-semibold text-foreground">every booking</span> — it covers your time, travel, and setup regardless of what services the customer selects. Think of it as your engagement fee.
+                      Your <span className="font-semibold text-foreground">base rate</span> is the cost of your lowest-priced service — it helps customers find you in budget-filtered searches.
+                      Your <span className="font-semibold text-foreground">service fee</span> (%) is applied to the order total and shown to customers separately.
                     </p>
                     <div className="space-y-2.5">
                       {[
                         {
-                          type: "DJ / Photographer",
-                          tip: "Set your full service fee as the base rate. Customers pay one flat price — no add-ons needed.",
+                          type: "DJ / MC / Event Host",
+                          tip: "Set your flat rate as the base rate. No separate service fee needed — your base rate is your full charge.",
                         },
                         {
                           type: "Caterer / Bar service",
-                          tip: "Set a small setup fee (e.g. ₦20,000). Then list your menu items (Rice, Cocktails…) as priced services from your dashboard — customers pick what they want.",
+                          tip: "Set your lowest item price as the base rate (e.g. ₦10,000 for a parfait). Add a service fee % for volume-based charges. List menu items from your dashboard.",
                         },
                         {
-                          type: "Decorator / Venue",
-                          tip: "Set your minimum engagement fee here. Add package tiers or specific décor items as services after sign-up.",
+                          type: "Logistics / Delivery",
+                          tip: "Enter your average fixed delivery charge above. This helps customers understand transport costs upfront.",
                         },
                       ].map(({ type, tip }) => (
                         <div key={type} className="flex gap-2.5 text-xs">
@@ -691,7 +749,18 @@ const VendorRegistration = () => {
                         <FormItem>
                           <FormLabel>Create Password <span className="text-destructive">*</span></FormLabel>
                           <FormControl>
-                            <Input type="password" placeholder="Enter a strong password" className="h-11 glass-input" {...field} />
+                            <div className="relative">
+                              <Input type={showPassword ? "text" : "password"} placeholder="Enter a strong password" className="h-11 glass-input pr-10" {...field} />
+                              <button
+                                type="button"
+                                onClick={() => setShowPassword((v) => !v)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                                tabIndex={-1}
+                                aria-label={showPassword ? "Hide password" : "Show password"}
+                              >
+                                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                              </button>
+                            </div>
                           </FormControl>
                           {/* Live requirements checklist */}
                           <div className="grid grid-cols-2 gap-1.5 mt-2 p-3 bg-muted/50 rounded-lg border border-border">
@@ -712,7 +781,18 @@ const VendorRegistration = () => {
                         <FormItem>
                           <FormLabel>Confirm Password <span className="text-destructive">*</span></FormLabel>
                           <FormControl>
-                            <Input type="password" placeholder="Re-enter your password" className="h-11 glass-input" {...field} />
+                            <div className="relative">
+                              <Input type={showPassword ? "text" : "password"} placeholder="Re-enter your password" className="h-11 glass-input pr-10" {...field} />
+                              <button
+                                type="button"
+                                onClick={() => setShowPassword((v) => !v)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                                tabIndex={-1}
+                                aria-label={showPassword ? "Hide password" : "Show password"}
+                              >
+                                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                              </button>
+                            </div>
                           </FormControl>
                           <FormMessage />
                         </FormItem>

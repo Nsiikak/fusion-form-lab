@@ -104,6 +104,8 @@ export const api = {
       location: string;
       description?: string;
       starting_price: number;
+      service_fee_percentage?: number;
+      logistics_fee?: number;
       business_size: string;
       registration_number?: string;
       phone_number?: string;
@@ -219,6 +221,12 @@ export const api = {
       notes?: string;
       payment_reference?: string;
       service_items?: Array<{ service_item_id: number; quantity: number }>;
+      event_address?: {
+        venue_name?: string;
+        city?: string;
+        state?: string;
+        delivery_instructions?: string;
+      };
     }) => {
       const response = await apiClient.post("/api/bookings", data);
       return response.data;

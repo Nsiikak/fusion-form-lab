@@ -9,7 +9,7 @@ from app.entities.vendor import schema
 from app.entities.vendor.schema import VendorResponse, VendorPublicResponse
 from app.entities.vendor.model import VendorCategory, Vendor, VerificationStatus
 from app.entities.vendor.service import VendorService
-from app.services.email import _fire_and_forget, send_vendor_welcome_email, send_vendor_approved_email
+from app.services.email import _fire_and_forget, send_vendor_welcome_email, send_vendor_approved_email, send_cac_verification_email
 from app.services.upload import upload_image, delete_image
 
 router = APIRouter()
@@ -27,6 +27,16 @@ async def register_vendor(
             send_vendor_welcome_email,
             owner.email, owner.full_name or owner.email, vendor.business_name
         )
+        # Always send CAC verification outcome so vendor knows their status
+        if vendor_data.registration_number:
+            _fire_and_forget(
+                send_cac_verification_email,
+                owner.email,
+                owner.full_name or owner.email,
+                vendor.business_name,
+                vendor.verification_status.value == "approved",
+                vendor.cac_verified_name,
+            )
     return vendor
 
 
@@ -111,6 +121,16 @@ async def re_verify_vendor(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vendor profile not found")
 
     vendor_obj, cac_result = VendorService.re_verify_vendor(db, vendor.id, current_user.id)
+
+    # Notify vendor of verification outcome via email
+    _fire_and_forget(
+        send_cac_verification_email,
+        current_user.email,
+        current_user.full_name or current_user.email,
+        vendor_obj.business_name,
+        cac_result.get("verified", False),
+        cac_result.get("cac_verified_name"),
+    )
 
     return {
         "vendor": schema.VendorResponse.model_validate(vendor_obj),

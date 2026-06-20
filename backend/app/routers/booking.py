@@ -18,6 +18,7 @@ from app.services.email import (
     send_booking_accepted_to_customer,
     send_booking_declined_to_customer,
     send_completion_pending_to_customer,
+    send_review_request,
 )
 
 logger = logging.getLogger(__name__)
@@ -199,6 +200,15 @@ async def update_booking_status(
                     vendor.business_name,
                     event_date,
                     amount,
+                )
+            elif new_status == BookingStatus.COMPLETED:
+                _fire_and_forget(
+                    send_review_request,
+                    customer.email,
+                    customer.full_name or customer.email,
+                    booking.id,
+                    vendor.business_name,
+                    event_date,
                 )
             elif new_status in (BookingStatus.DECLINED, BookingStatus.CANCELLED):
                 _fire_and_forget(

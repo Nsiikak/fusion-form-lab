@@ -9,6 +9,12 @@ class ServiceItemOrder(BaseModel):
     service_item_id: int
     quantity: int = Field(..., ge=1, le=10000)
 
+class EventAddress(BaseModel):
+    venue_name: Optional[str] = Field(None, max_length=200)
+    city: Optional[str] = Field(None, max_length=100)
+    state: Optional[str] = Field(None, max_length=100)
+    delivery_instructions: Optional[str] = Field(None, max_length=500)
+
 class BookingBase(BaseModel):
     vendor_id: int
     event_id: Optional[int] = None
@@ -16,6 +22,7 @@ class BookingBase(BaseModel):
     event_date: datetime
     event_time: Optional[time] = None
     notes: Optional[str] = Field(None, max_length=2000)
+    event_address: Optional[EventAddress] = None
 
     @field_validator("event_date")
     @classmethod

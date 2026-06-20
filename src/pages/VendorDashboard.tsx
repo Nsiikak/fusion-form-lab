@@ -642,6 +642,59 @@ const VendorDashboard = () => {
             </TabsContent>
 
             <TabsContent value="settings" className="space-y-6">
+              {/* Pricing Settings */}
+              <Card className="bg-white border border-border p-6">
+                <h2 className="text-2xl font-bold mb-2 text-foreground">Pricing Settings</h2>
+                <p className="text-muted-foreground mb-6">Update your service fee and logistics charge. These are shown to customers during booking.</p>
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    const fd = new FormData(e.currentTarget);
+                    const service_fee_percentage = fd.get("service_fee_percentage") ? Number(fd.get("service_fee_percentage")) : undefined;
+                    const logistics_fee = fd.get("logistics_fee") ? Number(fd.get("logistics_fee")) : undefined;
+                    try {
+                      await api.vendors.updateMyVendor({ service_fee_percentage, logistics_fee });
+                      toast.success("Pricing settings saved!");
+                      queryClient.invalidateQueries({ queryKey: ["vendor-profile"] });
+                    } catch (error: any) {
+                      toast.error(error.response?.data?.detail || "Failed to save pricing settings");
+                    }
+                  }}
+                  className="space-y-4 max-w-md"
+                >
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Service Fee (%)</label>
+                    <p className="text-xs text-muted-foreground">Added as a percentage of the order subtotal. Leave blank if you don't charge a service fee.</p>
+                    <input
+                      type="number"
+                      name="service_fee_percentage"
+                      min={0}
+                      max={100}
+                      step={0.01}
+                      placeholder="e.g. 10"
+                      defaultValue={vendorProfile?.service_fee_percentage != null ? Number(vendorProfile.service_fee_percentage) : ""}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    />
+                  </div>
+                  {vendorProfile?.category === "logistics" && (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Logistics / Delivery Fee (₦)</label>
+                      <p className="text-xs text-muted-foreground">Fixed delivery charge added to every booking.</p>
+                      <input
+                        type="number"
+                        name="logistics_fee"
+                        min={0}
+                        step={100}
+                        placeholder="e.g. 15000"
+                        defaultValue={vendorProfile?.logistics_fee != null ? Number(vendorProfile.logistics_fee) : ""}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      />
+                    </div>
+                  )}
+                  <Button type="submit">Save Pricing</Button>
+                </form>
+              </Card>
+
               <Card className="bg-white border border-border p-6">
                 <h2 className="text-2xl font-bold mb-6 text-foreground">Payout Settings</h2>
                 <p className="text-muted-foreground mb-6">Enter your bank details to receive payouts automatically when you complete bookings.</p>

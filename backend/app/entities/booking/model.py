@@ -33,6 +33,7 @@ class Booking(Base):
     event_date = Column(DateTime(timezone=True), nullable=False)
     event_time = Column(Time, nullable=True)
     notes = Column(Text, nullable=True)
+    event_address = Column(JSON, nullable=True)   # {venue_name, city, state, delivery_instructions}
     paid_out = Column(Boolean, default=False, nullable=False)
     service_items_snapshot = Column(JSON, nullable=True)
     vendor_confirmed_at = Column(DateTime(timezone=True), nullable=True)  # when vendor marked complete

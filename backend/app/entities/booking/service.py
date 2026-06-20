@@ -79,6 +79,7 @@ class BookingService:
                 "customer_email": customer.email if customer else None,
                 "has_review": booking.id in reviewed_ids,
                 "service_items_snapshot": booking.service_items_snapshot,
+                "event_address": booking.event_address,
                 "vendor_confirmed_at": booking.vendor_confirmed_at.isoformat() if booking.vendor_confirmed_at else None,
             })
         
@@ -143,6 +144,7 @@ class BookingService:
             )
 
         # Create booking
+        event_address_dict = booking_data.event_address.model_dump() if booking_data.event_address else None
         db_booking = Booking(
             customer_id=customer_id,
             vendor_id=booking_data.vendor_id,
@@ -151,6 +153,7 @@ class BookingService:
             event_date=booking_data.event_date,
             event_time=booking_data.event_time,
             notes=booking_data.notes,
+            event_address=event_address_dict,
             status=BookingStatus.PENDING,
             service_items_snapshot=snapshot,
         )

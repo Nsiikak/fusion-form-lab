@@ -73,6 +73,8 @@ class VendorService:
             location=vendor_data.location,
             description=vendor_data.description,
             starting_price=vendor_data.starting_price,
+            service_fee_percentage=vendor_data.service_fee_percentage,
+            logistics_fee=vendor_data.logistics_fee,
             business_size=vendor_data.business_size,
             registration_number=vendor_data.registration_number,
             verification_status=verification_status,

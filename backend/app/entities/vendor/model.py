@@ -45,6 +45,8 @@ class Vendor(Base):
     location = Column(String, nullable=False)
     description = Column(Text, nullable=True)
     starting_price = Column(Numeric(10, 2), nullable=False)
+    service_fee_percentage = Column(Numeric(5, 2), nullable=True)   # % added on top of items
+    logistics_fee = Column(Numeric(10, 2), nullable=True)            # fixed delivery charge
     business_size = Column(Enum(BusinessSize), nullable=False)
     registration_number = Column(String, nullable=True)
     verification_status = Column(Enum(VerificationStatus), default=VerificationStatus.PENDING, nullable=False)

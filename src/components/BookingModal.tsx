@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, Clock, CheckCircle2, Loader2, CreditCard, Plus, Minus, Package } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, CheckCircle2, Loader2, CreditCard, Plus, Minus, Package, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -35,16 +35,24 @@ interface BookingModalProps {
         id: number;
         business_name: string;
         starting_price: number | string;
+        category?: string;
+        service_fee_percentage?: number | string | null;
+        logistics_fee?: number | string | null;
     };
+    eventId?: number;
 }
 
-const BookingModal = ({ isOpen, onClose, vendor }: BookingModalProps) => {
+const BookingModal = ({ isOpen, onClose, vendor, eventId }: BookingModalProps) => {
     const { user } = useAuth();
     const [date, setDate] = useState<Date>();
     const [time, setTime] = useState("");
     const [notes, setNotes] = useState("");
     const [isProcessing, setIsProcessing] = useState(false);
     const [cart, setCart] = useState<Map<number, CartEntry>>(new Map());
+    const [venueName, setVenueName] = useState("");
+    const [city, setCity] = useState("");
+    const [eventState, setEventState] = useState("");
+    const [deliveryInstructions, setDeliveryInstructions] = useState("");
 
     const startingPrice = Number(vendor.starting_price);
     const publicKey = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || "";
@@ -66,12 +74,18 @@ const BookingModal = ({ isOpen, onClose, vendor }: BookingModalProps) => {
     );
     const baseTotal = startingPrice + cartTotal;
 
-    // 2.5% customer-side service fee (platform keeps this in addition to the 10% vendor commission)
-    const SERVICE_FEE_RATE = 0.025;
-    const serviceFee = Math.round(baseTotal * SERVICE_FEE_RATE);
-    const grossTotal = baseTotal + serviceFee;
+    // Vendor-defined fees (set during vendor registration)
+    const vendorServiceFeeRate = Number(vendor.service_fee_percentage ?? 0) / 100;
+    const vendorServiceFee = vendorServiceFeeRate > 0 ? Math.round(baseTotal * vendorServiceFeeRate) : 0;
+    const vendorLogisticsFee = Number(vendor.logistics_fee ?? 0);
+    const vendorTotal = baseTotal + vendorServiceFee + vendorLogisticsFee;
 
-    // Paystack expects kobo — charge the gross (base + service fee)
+    // 2.5% platform fee on top of vendor total
+    const SERVICE_FEE_RATE = 0.025;
+    const serviceFee = Math.round(vendorTotal * SERVICE_FEE_RATE);
+    const grossTotal = vendorTotal + serviceFee;
+
+    // Paystack expects kobo
     const paystackAmount = Math.round(grossTotal * 100);
 
     // Reset everything when modal closes
@@ -82,6 +96,10 @@ const BookingModal = ({ isOpen, onClose, vendor }: BookingModalProps) => {
             setNotes("");
             setIsProcessing(false);
             setCart(new Map());
+            setVenueName("");
+            setCity("");
+            setEventState("");
+            setDeliveryInstructions("");
         }
     }, [isOpen]);
 
@@ -114,14 +132,22 @@ const BookingModal = ({ isOpen, onClose, vendor }: BookingModalProps) => {
                       }))
                     : undefined;
 
+            const hasAddress = venueName.trim() || city.trim() || eventState.trim();
             await api.bookings.create({
                 vendor_id: vendor.id,
-                price: baseTotal,   // base price; service fee is collected by platform via Paystack
+                event_id: eventId,
+                price: vendorTotal,
                 event_date: eventDatetime,
                 event_time: time || undefined,
                 notes: notes.trim() || undefined,
                 payment_reference: reference.reference,
                 service_items: serviceItemsPayload,
+                event_address: hasAddress ? {
+                    venue_name: venueName.trim() || undefined,
+                    city: city.trim() || undefined,
+                    state: eventState.trim() || undefined,
+                    delivery_instructions: deliveryInstructions.trim() || undefined,
+                } : undefined,
             });
 
             toast.success("Booking confirmed! The vendor has been notified.");
@@ -186,7 +212,7 @@ const BookingModal = ({ isOpen, onClose, vendor }: BookingModalProps) => {
                                                     {item.description && ` · ${item.description}`}
                                                 </p>
                                             </div>
-                                            <div className="flex items-center gap-2 flex-shrink-0">
+                                            <div className="flex items-center gap-1.5 flex-shrink-0">
                                                 <Button
                                                     type="button"
                                                     variant="outline"
@@ -197,9 +223,19 @@ const BookingModal = ({ isOpen, onClose, vendor }: BookingModalProps) => {
                                                 >
                                                     <Minus className="h-3 w-3" />
                                                 </Button>
-                                                <span className="w-8 text-center text-sm font-semibold tabular-nums">
-                                                    {qty}
-                                                </span>
+                                                <input
+                                                    type="number"
+                                                    min={0}
+                                                    max={10000}
+                                                    value={qty === 0 ? "" : qty}
+                                                    placeholder="0"
+                                                    onChange={(e) => {
+                                                        const val = parseInt(e.target.value, 10);
+                                                        if (e.target.value === "") setQuantity(item, 0);
+                                                        else if (!isNaN(val) && val >= 0 && val <= 10000) setQuantity(item, val);
+                                                    }}
+                                                    className="w-16 text-center text-sm font-semibold tabular-nums border border-input rounded-md h-7 px-1 focus:outline-none focus:ring-1 focus:ring-primary bg-background"
+                                                />
                                                 <Button
                                                     type="button"
                                                     variant="outline"
@@ -274,6 +310,39 @@ const BookingModal = ({ isOpen, onClose, vendor }: BookingModalProps) => {
                         />
                     </div>
 
+                    {/* Event Address */}
+                    <div className="space-y-3">
+                        <Label className="flex items-center gap-2">
+                            <MapPin className="h-4 w-4 text-primary" />
+                            Event Location
+                            <span className="text-muted-foreground font-normal text-xs">(optional)</span>
+                        </Label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <Input
+                                placeholder="Venue / Event Hall name"
+                                value={venueName}
+                                onChange={(e) => setVenueName(e.target.value)}
+                                className="sm:col-span-2"
+                            />
+                            <Input
+                                placeholder="City"
+                                value={city}
+                                onChange={(e) => setCity(e.target.value)}
+                            />
+                            <Input
+                                placeholder="State"
+                                value={eventState}
+                                onChange={(e) => setEventState(e.target.value)}
+                            />
+                            <Input
+                                placeholder="Delivery / Access instructions (optional)"
+                                value={deliveryInstructions}
+                                onChange={(e) => setDeliveryInstructions(e.target.value)}
+                                className="sm:col-span-2"
+                            />
+                        </div>
+                    </div>
+
                     {/* Price summary */}
                     <div className="bg-primary/5 p-4 rounded-lg border border-primary/10 space-y-2">
                         {/* Base rate — always shown */}
@@ -296,6 +365,25 @@ const BookingModal = ({ isOpen, onClose, vendor }: BookingModalProps) => {
                                 </span>
                             </div>
                         ))}
+
+                        {/* Vendor service fee */}
+                        {vendorServiceFee > 0 && (
+                            <div className="flex justify-between text-sm text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                    Vendor service fee
+                                    <span className="text-[10px] bg-muted px-1.5 py-0.5 rounded font-medium">{Number(vendor.service_fee_percentage)}%</span>
+                                </span>
+                                <span>₦{vendorServiceFee.toLocaleString()}</span>
+                            </div>
+                        )}
+
+                        {/* Logistics fee */}
+                        {vendorLogisticsFee > 0 && (
+                            <div className="flex justify-between text-sm text-muted-foreground">
+                                <span>Logistics / delivery fee</span>
+                                <span>₦{vendorLogisticsFee.toLocaleString()}</span>
+                            </div>
+                        )}
 
                         {/* Platform service fee */}
                         <div className="flex justify-between text-sm text-muted-foreground">

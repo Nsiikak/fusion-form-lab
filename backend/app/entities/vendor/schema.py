@@ -13,6 +13,8 @@ class VendorBase(BaseModel):
     location: str = Field(..., max_length=300)
     description: Optional[str] = Field(None, max_length=5000)
     starting_price: Decimal
+    service_fee_percentage: Optional[Decimal] = Field(None, ge=0, le=100)
+    logistics_fee: Optional[Decimal] = Field(None, ge=0)
     business_size: BusinessSize
     registration_number: Optional[str] = Field(None, max_length=50)
 
@@ -44,6 +46,8 @@ class VendorUpdate(BaseModel):
     location: Optional[str] = Field(None, max_length=300)
     description: Optional[str] = Field(None, max_length=5000)
     starting_price: Optional[Decimal] = None
+    service_fee_percentage: Optional[Decimal] = Field(None, ge=0, le=100)
+    logistics_fee: Optional[Decimal] = Field(None, ge=0)
     business_size: Optional[BusinessSize] = None
     registration_number: Optional[str] = Field(None, max_length=50)
     bank_code: Optional[str] = Field(None, max_length=10)
@@ -59,6 +63,7 @@ class VendorPublicResponse(VendorBase):
     is_active: bool
     profile_image_url: Optional[str] = None
     gallery_images: Optional[list[str]] = None
+    average_rating: Optional[float] = None
     # CAC verification (read-only metadata, no sensitive financial data)
     cac_verified_name: Optional[str] = None
     cac_verification_attempted: bool = False
