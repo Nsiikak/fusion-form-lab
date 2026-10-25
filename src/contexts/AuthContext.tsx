@@ -6,7 +6,7 @@ interface User {
   email: string;
   full_name?: string;
   phone_number?: string;
-  role: 'customer' | 'vendor' | 'admin';
+  role: 'customer' | 'vendor' | 'admin' | 'support';
   is_active: boolean;
   is_verified: boolean;
   created_at: string;

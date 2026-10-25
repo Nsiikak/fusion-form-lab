@@ -1,1 +1,3 @@
+# Serve the live sitemap from the API (replace YOUR-API-DOMAIN)
+/sitemap.xml  https://YOUR-API-DOMAIN/sitemap.xml  200
 /*    /index.html   200

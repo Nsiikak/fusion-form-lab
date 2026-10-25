@@ -50,7 +50,7 @@ const ForgotPassword = () => {
           <img
             src="/Plagohive.svg"
             alt="Plagohive"
-            className="h-10 w-auto object-contain"
+            className="w-auto object-contain h-7 sm:h-8"
             style={{ filter: "brightness(0) invert(1)" }}
           />
         </Link>

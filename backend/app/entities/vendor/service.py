@@ -1,3 +1,4 @@
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_
 from typing import List, Optional
@@ -73,11 +74,13 @@ class VendorService:
             location=vendor_data.location,
             description=vendor_data.description,
             starting_price=vendor_data.starting_price,
-            service_fee_percentage=vendor_data.service_fee_percentage,
             logistics_fee=vendor_data.logistics_fee,
             business_size=vendor_data.business_size,
             registration_number=vendor_data.registration_number,
             verification_status=verification_status,
+            verified_at=func.now() if verification_status == VerificationStatus.APPROVED else None,
+            cancellation_policy=vendor_data.cancellation_policy or "standard",
+            base_state=vendor_data.base_state,
             cac_id=cac_id,
             cac_verified_name=cac_verified_name,
             cac_verification_attempted=cac_verification_attempted,
@@ -153,8 +156,10 @@ class VendorService:
             )
             vendor.cac_id = cac_result.get("cac_id")
             vendor.cac_verified_name = cac_result.get("cac_verified_name")
-            if cac_result.get("verified"):
+            # A CAC match auto-approves a pending vendor, but never overrides an admin rejection.
+            if cac_result.get("verified") and vendor.verification_status == VerificationStatus.PENDING:
                 vendor.verification_status = VerificationStatus.APPROVED
+                vendor.verified_at = func.now()
             else:
                 # Keep current status but surface the reason via the response
                 pass
@@ -178,10 +183,23 @@ class VendorService:
         search: Optional[str] = None,
         page: int = 1,
         limit: int = 20,
-        only_verified: bool = True
+        only_verified: bool = True,
+        available_on=None,
     ) -> tuple[List[Vendor], int]:
         """List vendors with filters and pagination"""
         query = db.query(Vendor).filter(Vendor.is_active == True)
+        if available_on is not None:
+            # Hide vendors who blocked the day or are already at their daily capacity
+            from sqlalchemy import func, and_
+            from app.entities.booking.model import Booking, BookingStatus
+            from app.entities.vendor.model import VendorBlockedDate
+            blocked = db.query(VendorBlockedDate.vendor_id).filter(VendorBlockedDate.day == available_on)
+            booked = (db.query(Booking.vendor_id, func.count(Booking.id).label("n"))
+                      .filter(func.date(Booking.event_date) == available_on,
+                              Booking.status.in_([BookingStatus.PENDING, BookingStatus.CONFIRMED, BookingStatus.AWAITING_CONFIRMATION]))
+                      .group_by(Booking.vendor_id).subquery())
+            query = query.filter(~Vendor.id.in_(blocked)).outerjoin(booked, booked.c.vendor_id == Vendor.id).filter(
+                (Vendor.daily_capacity.is_(None)) | (booked.c.n.is_(None)) | (booked.c.n < Vendor.daily_capacity))
         
         # Only show approved vendors by default
         if only_verified:
@@ -215,7 +233,7 @@ class VendorService:
         
         # Apply pagination
         offset = (page - 1) * limit
-        vendors = query.order_by(Vendor.created_at.desc()).offset(offset).limit(limit).all()
+        vendors = query.order_by(Vendor.quality_score.desc(), Vendor.created_at.desc()).offset(offset).limit(limit).all()
         
         return vendors, total
     

@@ -16,7 +16,7 @@ const NotFound = () => {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6 py-20" style={{ background: "var(--gradient-hero)" }}>
       <Link to="/" className="mb-10">
-        <img src="/Plagohive.svg" alt="Plagohive" className="h-10 w-auto object-contain" />
+        <img src="/Plagohive.svg" alt="Plagohive" className="w-auto object-contain h-7 sm:h-8" />
       </Link>
 
       <div className="text-center max-w-md">

@@ -85,7 +85,7 @@ const Register = () => {
   return (
     <div className="min-h-screen flex font-sans">
       {/* ── Left panel – dark brand canvas ── */}
-      <div className="hidden lg:flex lg:w-[52%] bg-[#0D1B2A] flex-col justify-between p-14 relative overflow-hidden">
+      <div className="hidden lg:flex lg:w-[52%] bg-navy flex-col justify-between p-14 relative overflow-hidden">
 
         {/* Geometric hive background */}
         <svg
@@ -118,7 +118,7 @@ const Register = () => {
 
         <div
           className="absolute top-[-60px] right-[-60px] w-[280px] h-[280px] rounded-full opacity-20 pointer-events-none"
-          style={{ background: "radial-gradient(circle, hsl(210 79% 42%) 0%, transparent 70%)" }}
+          style={{ background: "radial-gradient(circle, hsl(29 89% 48%) 0%, transparent 70%)" }}
         />
         <div
           className="absolute bottom-[-80px] left-[-80px] w-[300px] h-[300px] rounded-full opacity-15 pointer-events-none"
@@ -128,14 +128,14 @@ const Register = () => {
         {/* Logo */}
         <div className="relative z-10">
           <Link to="/" className="inline-flex">
-            <img src="/Plagohive.svg" alt="Plagohive" className="h-9 w-auto block object-contain" style={{ filter: "brightness(0) invert(1)" }} />
+            <img src="/Plagohive.svg" alt="Plagohive" className="w-auto block object-contain h-7 sm:h-8" style={{ filter: "brightness(0) invert(1)" }} />
           </Link>
         </div>
 
         {/* Main copy */}
         <div className="relative z-10">
           <p className="text-accent text-sm font-bold uppercase tracking-widest mb-5">
-            Join the community
+            Nigeria's protected event marketplace
           </p>
           <h2
             className="font-display font-extrabold text-white leading-[1.05] mb-7"
@@ -145,22 +145,23 @@ const Register = () => {
             <span className="text-primary">Every time.</span>
           </h2>
 
-          <div className="flex flex-col gap-5 mb-12">
+          <ul className="flex flex-col gap-4 mb-12">
             {[
-              { icon: "🔍", text: "Browse thousands of verified vendors" },
-              { icon: "⭐", text: "Read authentic, confirmed reviews" },
-              { icon: "🔒", text: "Secure payments and booking protection" },
-            ].map((item) => (
-              <div key={item.text} className="flex items-start gap-3.5">
-                <span className="text-lg leading-none mt-0.5">{item.icon}</span>
-                <span className="text-white/65 text-[14.5px] leading-snug">{item.text}</span>
-              </div>
+              "Every vendor verified before they're listed",
+              "Your money is held until your event is done",
+              "Full refund if a vendor cancels or doesn't show",
+              "Reviews only from real bookings",
+            ].map((text) => (
+              <li key={text} className="flex items-start gap-3">
+                <span className="mt-1 h-5 w-5 flex-shrink-0 rounded-full bg-celebrate-emerald text-white text-xs font-bold flex items-center justify-center">&#10003;</span>
+                <span className="text-white/75 text-[15px] leading-snug">{text}</span>
+              </li>
             ))}
-          </div>
+          </ul>
 
           <div className="border-t border-white/10 pt-6">
             <p className="text-white/30 text-xs font-medium uppercase tracking-widest">
-              Free to join · No credit card required
+              Free to join · Payments by Paystack
             </p>
           </div>
         </div>
@@ -175,7 +176,7 @@ const Register = () => {
         {/* Top bar */}
         <div className="flex items-center justify-between px-8 md:px-14 py-6 flex-shrink-0">
           <Link to="/" className="lg:hidden inline-flex">
-            <img src="/Plagohive.svg" alt="Plagohive" className="h-10 w-auto block object-contain" />
+            <img src="/Plagohive.svg" alt="Plagohive" className="w-auto block object-contain h-7 sm:h-8" />
           </Link>
           <div className="hidden lg:block" />
           <p className="text-sm text-muted-foreground">

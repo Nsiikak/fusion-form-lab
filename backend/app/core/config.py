@@ -53,7 +53,6 @@ SMTP_USER = os.getenv("SMTP_USER", "")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 EMAIL_FROM_NAME = os.getenv("EMAIL_FROM_NAME", "Plagohive")
 EMAIL_FROM_ADDRESS = os.getenv("EMAIL_FROM_ADDRESS", SMTP_USER)
-FRONTEND_URL = os.getenv("FRONTEND_URL", "https://plagohive.netlify.app")
 
 # ── Cloudinary (production image uploads) ────────────────────────────────────
 CLOUDINARY_CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME", "")
@@ -71,3 +70,36 @@ else:
         "http://localhost:3000",
         "https://plagohive.netlify.app",
     ]
+
+# The website address used in every email link (password resets, bookings, receipts).
+# Must be the site people actually use: a wrong value sends them to a different site and database.
+# Blank or missing → the first origin you set in CORS_ORIGINS, then the live Netlify site.
+FRONTEND_URL = (os.getenv("FRONTEND_URL", "").strip() or (CORS_ORIGINS[0] if _cors_env else "")
+                or "https://plagohive.netlify.app").rstrip("/")
+
+# ── Fees & payments ───────────────────────────────────────────────────────────
+from decimal import Decimal as _Decimal
+
+# Charged to the customer on top of the vendor's total at checkout.
+PLATFORM_CUSTOMER_FEE_RATE = _Decimal(os.getenv("PLATFORM_CUSTOMER_FEE_RATE", "0.025"))
+# Deducted from the vendor's total at payout. Shown to vendors only, never to customers.
+VENDOR_COMMISSION_RATE = _Decimal(os.getenv("VENDOR_COMMISSION_RATE", "0.10"))
+# Unpaid checkouts older than this are cancelled by the background task.
+CHECKOUT_EXPIRY_MINUTES = int(os.getenv("CHECKOUT_EXPIRY_MINUTES", "60"))
+
+PAYSTACK_SECRET_KEY = os.getenv("PAYSTACK_SECRET_KEY", "")
+if ENVIRONMENT == "production" and not PAYSTACK_SECRET_KEY:
+    raise ValueError("PAYSTACK_SECRET_KEY must be set in production.")
+
+# Optional: where to send "new dispute" alerts (comma-separated)
+ADMIN_ALERT_EMAILS = [e.strip() for e in os.getenv("ADMIN_ALERT_EMAILS", "").split(",") if e.strip()]
+
+# Payouts above this amount (naira) wait for an admin to approve them in the dashboard.
+PAYOUT_APPROVAL_THRESHOLD = _Decimal(os.getenv("PAYOUT_APPROVAL_THRESHOLD", "100000"))
+
+# ── Business details printed on receipts and payout statements ───────────────
+COMPANY_NAME = os.getenv("COMPANY_NAME", "Plagohive")
+COMPANY_ADDRESS = os.getenv("COMPANY_ADDRESS", "Lagos, Nigeria")
+COMPANY_EMAIL = os.getenv("COMPANY_EMAIL") or os.getenv("EMAIL_FROM_ADDRESS") or "hello@plagohive.com"
+COMPANY_RC_NUMBER = os.getenv("COMPANY_RC_NUMBER", "")      # CAC registration number, if registered
+COMPANY_TIN = os.getenv("COMPANY_TIN", "")                  # tax ID, if registered

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import ReviewModal from "@/components/ReviewModal";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -14,8 +14,25 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Calendar, Star, Clock, CheckCircle2, Package, LogOut, Loader2, CreditCard, Utensils, Palette, Camera, Music, Truck, Building2, Store, Info, Plus, MapPin, Banknote, ChevronDown, ChevronUp } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Calendar, Star, Clock, CheckCircle2, Package, LogOut, Loader2, CreditCard, Utensils, Palette, Camera, Music, Truck, Building2, Store, Info, Plus, MapPin, Banknote, ChevronDown, ChevronUp, AlertTriangle, Scale } from "lucide-react";
+import ReportProblemDialog from "@/components/ReportProblemDialog";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import DashboardHeader from "@/components/common/DashboardHeader";
+import BookingTimeline from "@/components/common/BookingTimeline";
+import RefundAccountCard from "@/components/common/RefundAccountCard";
+import { ShowMoreButton, useShowMore } from "@/components/common/ShowMore";
+import AddonsPanel from "@/components/common/AddonsPanel";
+import EventChecklist from "@/components/common/EventChecklist";
+import { OCCASIONS, occasionBySlug } from "@/lib/occasions";
+import { CATEGORIES } from "@/lib/categories";
+import ImageCarousel from "@/components/common/ImageCarousel";
+import QuoteCard from "@/components/common/QuoteCard";
+import { useFavorites } from "@/components/common/FavoriteButton";
+import { thumb } from "@/lib/images";
+import { CancelBookingDialog } from "@/components/common/CancellationDialogs";
+import { FileText, MessageCircle } from "lucide-react";
+import { useConfirm } from "@/components/common/ConfirmDialog";
+import { formatNaira } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api";
 import { format } from "date-fns";
@@ -26,29 +43,16 @@ const RecommendedVendors = () => {
   const { data: recommendedVendors = [], isLoading } = useQuery({
     queryKey: ["recommended-vendors"],
     queryFn: async () => {
-      return await api.vendors.getRecommended(3);
+      return await api.vendors.getRecommended(6);
     },
   });
+  const rec = useShowMore(recommendedVendors as any[], 3);
 
-  const categoryIconMap: Record<string, React.ElementType> = {
-    catering: Utensils,
-    decoration: Palette,
-    photography: Camera,
-    entertainment: Music,
-    logistics: Truck,
-    venue: Building2,
-  };
+  const categoryIconMap: Record<string, React.ElementType> = Object.fromEntries(CATEGORIES.map((c) => [c.value, c.icon]));
   const getCategoryIcon = (category: string): React.ElementType => categoryIconMap[category] || Store;
 
   const getCategoryDisplayName = (category: string) => {
-    const nameMap: Record<string, string> = {
-      catering: "Catering",
-      decoration: "Decoration",
-      photography: "Photography",
-      entertainment: "Entertainment",
-      logistics: "Logistics",
-      venue: "Venue",
-    };
+    const nameMap: Record<string, string> = Object.fromEntries(CATEGORIES.map((c) => [c.value, c.label]));
     return nameMap[category] || category;
   };
 
@@ -71,11 +75,17 @@ const RecommendedVendors = () => {
     <section className="mt-16">
       <h2 className="text-2xl font-bold mb-6">Recommended for You</h2>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {recommendedVendors.map((vendor: any) => (
+        {rec.visible.map((vendor: any) => (
           <Link key={vendor.id} to={`/vendors/${vendor.id}`}>
             <Card className="bg-white border border-border overflow-hidden hover:shadow-[var(--shadow-3d)] transition-all hover:-translate-y-1 cursor-pointer group">
-              <div className="aspect-video bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center group-hover:scale-105 transition-transform duration-300">
-                {(() => { const Icon = getCategoryIcon(vendor.category); return <Icon className="h-10 w-10 text-primary/40" />; })()}
+              <div className="aspect-video bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center overflow-hidden">
+                {vendor.gallery_images?.length ? (
+                  <ImageCarousel images={vendor.gallery_images.slice(0, 6)} alt={vendor.business_name} className="w-full h-full" />
+                ) : vendor.profile_image_url ? (
+                  <img src={vendor.profile_image_url} alt={vendor.business_name} className="w-full h-full object-cover" />
+                ) : (
+                  (() => { const Icon = getCategoryIcon(vendor.category); return <Icon className="h-10 w-10 text-primary/40" />; })()
+                )}
               </div>
               <div className="p-6">
                 {vendor.average_rating != null && (
@@ -93,6 +103,7 @@ const RecommendedVendors = () => {
           </Link>
         ))}
       </div>
+      <ShowMoreButton {...rec} noun="more vendors" className="mt-4" />
     </section>
   );
 };
@@ -102,6 +113,9 @@ const CustomerDashboard = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [disputeBooking, setDisputeBooking] = useState<any | null>(null);
+  const [cancelBooking, setCancelBooking] = useState<any | null>(null);
+  const confirm = useConfirm();
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
   const [bookingDetailOpen, setBookingDetailOpen] = useState(false);
   const [detailBooking, setDetailBooking] = useState<any>(null);
@@ -111,6 +125,20 @@ const CustomerDashboard = () => {
   const [newEventLocation, setNewEventLocation] = useState("");
   const [newEventBudget, setNewEventBudget] = useState("");
   const [newEventDesc, setNewEventDesc] = useState("");
+  const [newEventType, setNewEventType] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const slug = searchParams.get("newEvent");
+    if (slug) {
+      const o = occasionBySlug(slug);
+      setNewEventType(o ? o.slug : "");
+      if (o) setNewEventName((n) => n || `My ${o.name.toLowerCase()}`);
+      setCreateEventOpen(true);
+      searchParams.delete("newEvent");
+      setSearchParams(searchParams, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [isCreatingEvent, setIsCreatingEvent] = useState(false);
   const [expandedEventId, setExpandedEventId] = useState<number | null>(null);
 
@@ -140,6 +168,9 @@ const CustomerDashboard = () => {
       return await api.bookings.list();
     },
   });
+  const { data: favorites = [] } = useFavorites();
+  const bookingList = useShowMore(bookings as any[], 4);
+  const eventList = useShowMore(events as any[], 3);
 
   const getEventName = (eventId: number) => {
     const event = events.find((e: any) => e.id === eventId);
@@ -171,13 +202,14 @@ const CustomerDashboard = () => {
         location: newEventLocation.trim(),
         description: newEventDesc.trim() || undefined,
         total_budget: newEventBudget ? Number(newEventBudget) : undefined,
-      });
+        event_type: newEventType || undefined,
+      } as any);
       toast.success("Event created! You can now book vendors for this event.");
       queryClient.invalidateQueries({ queryKey: ["events"] });
       queryClient.invalidateQueries({ queryKey: ["customer-stats"] });
       setCreateEventOpen(false);
       setNewEventName(""); setNewEventDate(""); setNewEventLocation("");
-      setNewEventBudget(""); setNewEventDesc("");
+      setNewEventBudget(""); setNewEventDesc(""); setNewEventType("");
     } catch (error: any) {
       toast.error(error.response?.data?.detail || "Failed to create event");
     } finally {
@@ -197,36 +229,17 @@ const CustomerDashboard = () => {
   return (
     <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-background">
       {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-white/70 backdrop-blur-md border-b border-white/20">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-3">
-          <div className="flex items-center justify-between">
-            <Link to="/">
-              <img src="/Plagohive.svg" alt="Plagohive" className="h-12 w-auto object-contain" />
-            </Link>
-            <nav className="hidden md:flex items-center gap-6">
-              <Link to="/vendor-search" className="text-sm font-medium hover:text-primary transition-colors">Find Vendors</Link>
-              <Link to="/customer-dashboard" className="text-sm font-medium text-primary bg-primary/10 px-3 py-1.5 rounded-full">Dashboard</Link>
-              {user && (
-                <span className="text-sm text-muted-foreground flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-accent text-white flex items-center justify-center font-bold">
-                    {user.full_name?.[0] || user.email?.[0] || "U"}
-                  </div>
-                  {user.full_name || user.email}
-                </span>
-              )}
-              <Button variant="ghost" size="sm" onClick={handleLogout} className="text-destructive hover:text-destructive hover:bg-destructive/10">
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
-              </Button>
-            </nav>
-          </div>
-        </div>
-      </header>
+      <DashboardHeader
+        links={[{ to: "/vendor-search", label: "Find Vendors" }, { to: "/customer-dashboard", label: "Dashboard" }, { to: "/messages", label: "Messages" }]}
+        displayName={user?.full_name || user?.email || "Account"}
+        subtitle={user?.email}
+        onLogout={handleLogout}
+      />
 
-      <section className="pt-32 pb-16">
+      <section className="pt-24 sm:pt-32 pb-16">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
           {/* Welcome Section */}
-          <div className="mb-12 animate-fade-in-up">
+          <div className="mb-6 sm:mb-12 animate-fade-in-up">
             <h1 className="text-3xl sm:text-4xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-primary to-accent">
               Welcome back, {user?.full_name?.split(' ')[0] || "User"}!
             </h1>
@@ -237,46 +250,46 @@ const CustomerDashboard = () => {
           {(() => {
             const needsConfirmation = (bookings as any[]).filter((b) => b.status === "awaiting_confirmation").length;
             return (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12 animate-fade-in-up [animation-delay:200ms]">
-            <Card className="bg-white border border-border p-6 hover:shadow-[var(--shadow-elevated)] transition-all">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-8 sm:mb-12 animate-fade-in-up [animation-delay:200ms]">
+            <Card className="bg-white border border-border p-4 sm:p-6 hover:shadow-[var(--shadow-elevated)] transition-all">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Upcoming Events</p>
-                  <p className="text-3xl font-bold text-primary">
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground mb-1">Upcoming Events</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-primary">
                     {statsLoading ? "..." : (stats?.upcoming_events || 0)}
                   </p>
                 </div>
-                <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center">
+                <div className="hidden sm:flex w-12 h-12 bg-primary/10 rounded-2xl items-center justify-center">
                   <Calendar className="h-6 w-6 text-primary" />
                 </div>
               </div>
             </Card>
 
-            <Card className="bg-white border border-border p-6 hover:shadow-[var(--shadow-elevated)] transition-all">
+            <Card className="bg-white border border-border p-4 sm:p-6 hover:shadow-[var(--shadow-elevated)] transition-all">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Awaiting Vendor</p>
-                  <p className="text-3xl font-bold text-orange-500">
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground mb-1">Awaiting Vendor</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-orange-500">
                     {statsLoading ? "..." : (stats?.pending_bookings || 0)}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">Vendor hasn't responded yet</p>
                 </div>
-                <div className="w-12 h-12 bg-orange-500/10 rounded-2xl flex items-center justify-center">
+                <div className="hidden sm:flex w-12 h-12 bg-orange-500/10 rounded-2xl items-center justify-center">
                   <Clock className="h-6 w-6 text-orange-500" />
                 </div>
               </div>
             </Card>
 
-            <Card className="bg-white border border-border p-6 hover:shadow-[var(--shadow-elevated)] transition-all">
+            <Card className="bg-white border border-border p-4 sm:p-6 hover:shadow-[var(--shadow-elevated)] transition-all">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Vendor Accepted</p>
-                  <p className="text-3xl font-bold text-green-600">
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground mb-1">Vendor Accepted</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-green-600">
                     {statsLoading ? "..." : (stats?.confirmed_bookings || 0)}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">Booked & ready for your event</p>
                 </div>
-                <div className="w-12 h-12 bg-green-500/10 rounded-2xl flex items-center justify-center">
+                <div className="hidden sm:flex w-12 h-12 bg-green-500/10 rounded-2xl items-center justify-center">
                   <CheckCircle2 className="h-6 w-6 text-green-600" />
                 </div>
               </div>
@@ -285,24 +298,55 @@ const CustomerDashboard = () => {
             <Card className={`border p-6 hover:shadow-[var(--shadow-elevated)] transition-all ${needsConfirmation > 0 ? "bg-red-50 border-red-200" : "bg-white border-border"}`}>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className={`text-sm font-medium mb-1 ${needsConfirmation > 0 ? "text-red-600" : "text-muted-foreground"}`}>
+                  <p className={`text-xs sm:text-sm font-medium mb-1 ${needsConfirmation > 0 ? "text-amber-700" : "text-muted-foreground"}`}>
                     Release Payment
                   </p>
-                  <p className={`text-3xl font-bold ${needsConfirmation > 0 ? "text-red-600" : "text-muted-foreground"}`}>
+                  <p className={`text-2xl sm:text-3xl font-bold ${needsConfirmation > 0 ? "text-amber-600" : "text-muted-foreground"}`}>
                     {bookingsLoading ? "..." : needsConfirmation}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
                     {needsConfirmation > 0 ? "Go to All Bookings to confirm" : "Nothing pending from you"}
                   </p>
                 </div>
-                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${needsConfirmation > 0 ? "bg-red-500/10" : "bg-muted/40"}`}>
-                  <CreditCard className={`h-6 w-6 ${needsConfirmation > 0 ? "text-red-500" : "text-muted-foreground"}`} />
+                <div className={`hidden sm:flex w-12 h-12 rounded-2xl items-center justify-center ${needsConfirmation > 0 ? "bg-amber-500/10" : "bg-muted/40"}`}>
+                  <CreditCard className={`h-6 w-6 ${needsConfirmation > 0 ? "text-amber-600" : "text-muted-foreground"}`} />
                 </div>
               </div>
             </Card>
           </div>
             );
           })()}
+
+          {/* Saved vendors */}
+          {(favorites as any[]).length > 0 && (
+            <section className="mb-10">
+              <h2 className="text-2xl font-bold mb-4">Saved vendors</h2>
+              <div className="flex gap-3 overflow-x-auto pb-2 snap-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {(favorites as any[]).map((v) => (
+                  <Link key={v.id} to={`/vendors/${v.id}`} className="snap-start flex-none w-44 rounded-2xl border border-border bg-white overflow-hidden hover:shadow-[var(--shadow-lg)] transition-shadow">
+                    <div className="h-24 bg-muted">
+                      {(v.gallery_images?.[0] || v.profile_image_url) && <img src={thumb(v.gallery_images?.[0] || v.profile_image_url, 360)} alt="" loading="lazy" className="h-full w-full object-cover" />}
+                    </div>
+                    <div className="p-3">
+                      <p className="text-sm font-semibold truncate">{v.business_name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{v.location}</p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Quotes vendors sent from chat, waiting for payment */}
+          {(bookings as any[]).some((b) => b.status === "awaiting_payment" && b.quote_expires_at && new Date(b.quote_expires_at) > new Date()) && (
+            <section className="mb-10">
+              <h2 className="text-2xl font-bold mb-4">Quotes waiting for you</h2>
+              <div className="grid md:grid-cols-2 gap-4">
+                {(bookings as any[]).filter((b) => b.status === "awaiting_payment" && b.quote_expires_at && new Date(b.quote_expires_at) > new Date())
+                  .map((b) => <QuoteCard key={b.id} bookingId={b.id} role="customer" />)}
+              </div>
+            </section>
+          )}
 
           {/* Bookings */}
           <div className="space-y-6 animate-fade-in-up [animation-delay:400ms]">
@@ -332,9 +376,9 @@ const CustomerDashboard = () => {
                   </Link>
                 </Card>
               ) : (
-                <div className="space-y-4">
-                  {bookings.map((booking: any) => (
-                    <Card key={booking.id} className="bg-white border border-border p-6 hover:shadow-lg transition-shadow">
+                <><div className="space-y-4">
+                  {bookingList.visible.map((booking: any) => (
+                    <Card key={booking.id} className="bg-white border border-border p-4 sm:p-6 rounded-2xl hover:shadow-lg transition-shadow">
                       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                         <div className="space-y-3">
                           <div className="flex items-center gap-3 flex-wrap">
@@ -347,7 +391,8 @@ const CustomerDashboard = () => {
                               className={`${booking.status === "confirmed" ? "bg-green-500/10 text-green-700 hover:bg-green-500/20" :
                                 booking.status === "pending" ? "bg-orange-500/10 text-orange-700 hover:bg-orange-500/20" :
                                 booking.status === "awaiting_confirmation" ? "bg-purple-500/10 text-purple-700 hover:bg-purple-500/20" :
-                                booking.status === "completed" ? "bg-blue-500/10 text-blue-700 hover:bg-blue-500/20" :
+                                booking.status === "completed" ? "bg-celebrate/10 text-celebrate hover:bg-celebrate/20" :
+                                booking.status === "disputed" ? "bg-amber-500/10 text-amber-700 hover:bg-amber-500/20" :
                                   "bg-gray-100 text-gray-700 hover:bg-gray-200"
                                 }`}
                             >
@@ -355,6 +400,7 @@ const CustomerDashboard = () => {
                                 pending: "Pending",
                                 confirmed: "Confirmed",
                                 awaiting_confirmation: "Confirm Completion",
+                                disputed: "Under Review",
                                 completed: "Completed",
                                 declined: "Declined",
                                 cancelled: "Cancelled",
@@ -376,37 +422,18 @@ const CustomerDashboard = () => {
                           </div>
                         </div>
 
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                          <div className="text-right">
-                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Price</p>
-                            <p className="text-xl font-bold text-primary">₦{Number(booking.price).toLocaleString()}</p>
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
+                          <div className="sm:text-right">
+                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">You paid</p>
+                            <p className="text-xl font-bold text-primary">{formatNaira(booking.price)}</p>
                           </div>
                           <div className="flex gap-2 flex-wrap items-center">
-                            {booking.status === "confirmed" && (
-                              <span className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/60 border border-border rounded-full px-3 py-1.5">
-                                <Clock className="h-3.5 w-3.5 flex-shrink-0" />
-                                Waiting for vendor to mark service complete
-                              </span>
-                            )}
                             {(booking.status === "pending" || booking.status === "confirmed") && (
                               <Button
                                 variant="outline"
                                 size="sm"
                                 className="text-destructive border-destructive/20 hover:bg-destructive/10"
-                                onClick={async () => {
-                                  const confirmed = booking.status === "confirmed"
-                                    ? window.confirm("This booking is already confirmed by the vendor. Are you sure you want to cancel? Cancellation policies may apply.")
-                                    : true;
-                                  if (!confirmed) return;
-                                  try {
-                                    await api.bookings.updateStatus(booking.id, "cancelled");
-                                    toast.success("Booking cancelled.");
-                                    queryClient.invalidateQueries({ queryKey: ["bookings"] });
-                                    queryClient.invalidateQueries({ queryKey: ["customer-stats"] });
-                                  } catch (error: any) {
-                                    toast.error(error.response?.data?.detail || "Failed to cancel booking");
-                                  }
-                                }}
+                                onClick={() => setCancelBooking(booking)}
                               >
                                 Cancel
                               </Button>
@@ -422,10 +449,10 @@ const CustomerDashboard = () => {
                                 ? Math.max(0, Math.ceil((autoReleaseAt.getTime() - Date.now()) / 3_600_000))
                                 : null;
                               return (
-                                <div className="flex flex-col items-start gap-1">
+                                <div className="flex flex-col items-start gap-1 w-full sm:w-auto">
                                   <Button
                                     size="sm"
-                                    className="bg-green-600 hover:bg-green-700 text-white shadow-md font-semibold"
+                                    className="w-full sm:w-auto h-auto py-2.5 whitespace-normal bg-green-600 hover:bg-green-700 text-white shadow-md font-semibold"
                                     onClick={async () => {
                                       try {
                                         await api.bookings.updateStatus(booking.id, "completed");
@@ -443,9 +470,32 @@ const CustomerDashboard = () => {
                                   <p className="text-[11px] text-muted-foreground pl-0.5">
                                     Vendor marked this service complete.{hoursLeft !== null ? ` Auto-releases in ~${hoursLeft}h if no action.` : ""}
                                   </p>
+                                  <button
+                                    type="button"
+                                    onClick={() => setDisputeBooking(booking)}
+                                    className="text-[11px] font-medium text-destructive hover:underline pl-0.5 flex items-center gap-1"
+                                  >
+                                    <AlertTriangle className="h-3 w-3" /> Something went wrong? Report a problem
+                                  </button>
                                 </div>
                               );
                             })()}
+
+                            {booking.status === "confirmed" && new Date(booking.event_date) < new Date() && (
+                              <Button
+                                variant="outline" size="sm"
+                                className="text-destructive border-destructive/20 hover:bg-destructive/10"
+                                onClick={() => setDisputeBooking(booking)}
+                              >
+                                <AlertTriangle className="h-4 w-4 mr-1.5" /> Vendor didn't show up?
+                              </Button>
+                            )}
+
+                            {booking.resolution_note && (
+                              <span className="text-xs text-muted-foreground bg-muted/60 border border-border rounded-lg px-3 py-1.5 max-w-sm">
+                                <span className="font-semibold">{booking.resolution === "refund" ? "Refunded" : "Payment released"}:</span> {booking.resolution_note}
+                              </span>
+                            )}
 
                             {booking.status === "completed" && !booking.has_review && (
                               <Button
@@ -458,6 +508,11 @@ const CustomerDashboard = () => {
                               >
                                 <Star className="h-4 w-4 mr-1" />
                                 Rate Vendor
+                              </Button>
+                            )}
+                            {booking.status === "completed" && (
+                              <Button size="sm" variant="outline" onClick={() => navigate(`/vendors/${booking.vendor_id}?book=1`)}>
+                                Book again
                               </Button>
                             )}
 
@@ -476,14 +531,48 @@ const CustomerDashboard = () => {
                               <Info className="h-4 w-4 mr-1" />
                               Details
                             </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-muted-foreground hover:text-primary"
+                              onClick={() => api.messages.forBooking(booking.id).then((c) => navigate(`/messages/${c.id}`)).catch(() => toast.error("Couldn't open the chat."))}
+                            >
+                              <MessageCircle className="h-4 w-4 mr-1" />
+                              Message
+                            </Button>
+                            {booking.counterpart_phone && (
+                              <a href={`tel:${booking.counterpart_phone}`} className="text-sm font-medium text-primary hover:underline px-2">
+                                Call vendor · {booking.counterpart_phone}
+                              </a>
+                            )}
+                            {booking.receipt_number && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-muted-foreground hover:text-primary"
+                                onClick={() => api.documents.download(booking.id, "receipt").catch(() => toast.error("Couldn't download the receipt. Please try again."))}
+                              >
+                                <FileText className="h-4 w-4 mr-1" />
+                                Receipt
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </div>
+                      <BookingTimeline booking={booking} role="customer" className="mt-4 pt-4 border-t border-border/70" />
+                      <AddonsPanel booking={booking} role="customer" />
                     </Card>
                   ))}
                 </div>
+                <ShowMoreButton {...bookingList} noun="more bookings" className="mt-4" /></>
               )}
           </div>
+
+          {/* Refund account — prominent when a refund is waiting for it */}
+          <RefundAccountCard
+            urgent={(bookings as any[]).some((b) => b.refund_status === "needs_details")}
+            className="mt-10"
+          />
 
           {/* Multi-Vendor Event Planning */}
           <div className="space-y-6 mt-12 animate-fade-in-up [animation-delay:600ms]">
@@ -514,8 +603,8 @@ const CustomerDashboard = () => {
                 </Button>
               </Card>
             ) : (
-              <div className="space-y-4">
-                {(events as any[]).map((event: any) => {
+              <><div className="space-y-4">
+                {eventList.visible.map((event: any) => {
                   const eventBookings = bookingsByEvent[event.id] || [];
                   const isExpanded = expandedEventId === event.id;
                   const totalSpent = eventBookings.reduce((s: number, b: any) => s + Number(b.price), 0);
@@ -531,7 +620,7 @@ const CustomerDashboard = () => {
                             <h3 className="font-bold text-lg">{event.name}</h3>
                             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                               event.status === "confirmed" ? "bg-green-100 text-green-700" :
-                              event.status === "completed" ? "bg-blue-100 text-blue-700" :
+                              event.status === "completed" ? "bg-celebrate/10 text-celebrate" :
                               event.status === "cancelled" ? "bg-red-100 text-red-700" :
                               "bg-orange-100 text-orange-700"
                             }`}>
@@ -557,6 +646,11 @@ const CustomerDashboard = () => {
                           {isExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
                         </div>
                       </button>
+                      {event.event_type && (
+                        <div className="px-4 sm:px-6 pb-4">
+                          <EventChecklist event={event} bookedCategories={eventBookings.map((b: any) => b.vendor_category)} />
+                        </div>
+                      )}
 
                       {isExpanded && (
                         <div className="border-t border-border bg-muted/20 px-6 py-4 space-y-3">
@@ -582,11 +676,11 @@ const CustomerDashboard = () => {
                                     {b.vendor_category && <span className="text-xs text-muted-foreground ml-2 capitalize">({b.vendor_category})</span>}
                                   </div>
                                   <div className="flex items-center gap-3">
-                                    <span className="font-medium text-primary">₦{Number(b.price).toLocaleString()}</span>
+                                    <span className="font-medium text-primary">{formatNaira(b.price)}</span>
                                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                                       b.status === "confirmed" ? "bg-green-100 text-green-700" :
                                       b.status === "pending" ? "bg-orange-100 text-orange-700" :
-                                      b.status === "completed" ? "bg-blue-100 text-blue-700" :
+                                      b.status === "completed" ? "bg-celebrate/10 text-celebrate" :
                                       "bg-gray-100 text-gray-600"
                                     }`}>{b.status}</span>
                                   </div>
@@ -611,6 +705,7 @@ const CustomerDashboard = () => {
                   );
                 })}
               </div>
+              <ShowMoreButton {...eventList} noun="more events" className="mt-4" /></>
             )}
           </div>
 
@@ -622,6 +717,15 @@ const CustomerDashboard = () => {
                 <DialogDescription>Set up an event to manage multiple vendors in one place.</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 pt-2">
+                <div className="space-y-1.5">
+                  <Label>What are you celebrating?</Label>
+                  <select value={newEventType} onChange={(e) => setNewEventType(e.target.value)}
+                    className="h-10 w-full rounded-md border border-input bg-white px-3 text-sm">
+                    <option value="">Something else</option>
+                    {OCCASIONS.map((o) => <option key={o.slug} value={o.slug}>{o.name}</option>)}
+                  </select>
+                  {newEventType && <p className="text-xs text-muted-foreground">We'll add a {occasionBySlug(newEventType)?.name.toLowerCase()} checklist and the vendors you'll need.</p>}
+                </div>
                 <div className="space-y-1.5">
                   <Label>Event Name <span className="text-destructive">*</span></Label>
                   <Input placeholder="e.g. Sarah's Birthday Party" value={newEventName} onChange={(e) => setNewEventName(e.target.value)} />
@@ -657,6 +761,24 @@ const CustomerDashboard = () => {
           {/* Recommended Vendors */}
           <RecommendedVendors />
 
+          <CancelBookingDialog
+            booking={cancelBooking}
+            onClose={() => setCancelBooking(null)}
+            onDone={() => {
+              queryClient.invalidateQueries({ queryKey: ["bookings"] });
+              queryClient.invalidateQueries({ queryKey: ["customer-stats"] });
+            }}
+          />
+
+          <ReportProblemDialog
+            booking={disputeBooking}
+            onClose={() => setDisputeBooking(null)}
+            onReported={() => {
+              queryClient.invalidateQueries({ queryKey: ["bookings"] });
+              queryClient.invalidateQueries({ queryKey: ["customer-stats"] });
+            }}
+          />
+
           {selectedBooking && (
             <ReviewModal
               isOpen={isReviewModalOpen}
@@ -689,7 +811,7 @@ const CustomerDashboard = () => {
                     </div>
                     <Badge className={
                       detailBooking.status === "confirmed" ? "bg-green-500/10 text-green-700" :
-                      detailBooking.status === "completed" ? "bg-blue-500/10 text-blue-700" :
+                      detailBooking.status === "completed" ? "bg-celebrate/10 text-celebrate" :
                       detailBooking.status === "pending" ? "bg-orange-500/10 text-orange-700" :
                       "bg-gray-100 text-gray-700"
                     }>
@@ -724,7 +846,7 @@ const CustomerDashboard = () => {
                     </div>
 
                     <div className="text-muted-foreground">Total Paid</div>
-                    <div className="font-bold text-primary">₦{Number(detailBooking.price).toLocaleString()}</div>
+                    <div className="font-bold text-primary">{formatNaira(detailBooking.price)}</div>
                   </div>
 
                   {/* Service items breakdown */}
@@ -739,7 +861,7 @@ const CustomerDashboard = () => {
                             <span className="text-foreground">
                               {s.name} <span className="text-muted-foreground">× {s.quantity}</span>
                             </span>
-                            <span className="font-medium">₦{Number(s.subtotal).toLocaleString()}</span>
+                            <span className="font-medium">{formatNaira(s.subtotal)}</span>
                           </div>
                         ))}
                       </div>

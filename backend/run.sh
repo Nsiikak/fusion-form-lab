@@ -10,7 +10,7 @@ ENV="${ENVIRONMENT:-development}"
 
 # Apply any pending database migrations before starting the server
 echo "Running database migrations..."
-alembic upgrade head
+python init_db.py
 
 if [ "$ENV" = "production" ]; then
     echo "Starting Plagohive API in PRODUCTION mode..."

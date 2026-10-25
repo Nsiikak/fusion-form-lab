@@ -1,4 +1,12 @@
-import { useState } from "react";
+import { CATEGORIES } from "@/lib/categories";
+import VendorGallery from "@/components/common/VendorGallery";
+import FavoriteButton, { ResponseBadge } from "@/components/common/FavoriteButton";
+import { useSeo } from "@/lib/seo";
+import { track } from "@/lib/analytics";
+import { categoryLabel } from "@/lib/categories";
+import { useState, useEffect } from "react";
+import { formatNaira } from "@/lib/utils";
+import { PolicySummary } from "@/components/common/CancellationPolicy";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -29,17 +37,11 @@ import {
     Camera,
     Music,
     Truck,
+    MessageCircle,
 } from "lucide-react";
 import { format } from "date-fns";
 
-const categoryIconMap: Record<string, React.ElementType> = {
-    catering: Utensils,
-    decoration: Palette,
-    photography: Camera,
-    entertainment: Music,
-    logistics: Truck,
-    venue: Building2,
-};
+const categoryIconMap: Record<string, React.ElementType> = Object.fromEntries(CATEGORIES.map((c) => [c.value, c.icon]));
 
 const getCategoryIcon = (category: string): React.ElementType =>
     categoryIconMap[category] || Building2;
@@ -98,6 +100,43 @@ const VendorDetails = () => {
         staleTime: 60_000,
     });
 
+    useSeo({
+        title: vendor ? `${vendor.business_name}: ${categoryLabel(vendor.category)} in ${vendor.location}` : "Vendor",
+        description: vendor ? `${(vendor.description || `Book ${vendor.business_name} on Plagohive.`).slice(0, 150)} Verified vendor; your payment is held until your event is done.` : undefined,
+        image: vendor?.gallery_images?.[0] || vendor?.profile_image_url,
+        jsonLd: vendor ? {
+            "@context": "https://schema.org", "@type": "LocalBusiness", name: vendor.business_name,
+            description: vendor.description || undefined, image: vendor.gallery_images?.slice(0, 4),
+            address: { "@type": "PostalAddress", addressLocality: vendor.location, addressRegion: vendor.base_state || undefined, addressCountry: "NG" },
+            url: window.location.href, priceRange: vendor.starting_price ? `From NGN ${Number(vendor.starting_price).toLocaleString()}` : undefined,
+            ...(vendor.total_reviews ? { aggregateRating: { "@type": "AggregateRating", ratingValue: vendor.average_rating, reviewCount: vendor.total_reviews } } : {}),
+        } : null,
+    });
+    useEffect(() => {
+        if (vendor?.id) track("vendor_viewed", { vendor_id: vendor.id, category: vendor.category });
+    }, [vendor?.id]);
+
+    // "Message" — ask questions before booking (same sign-in rules as booking)
+    const handleMessageClick = () => {
+        if (!isAuthenticated) {
+            setIsAuthPromptOpen(true);
+            return;
+        }
+        if (user?.role === "vendor") {
+            toast.error("Switch to a customer account to message vendors.");
+            return;
+        }
+        if (vendor) navigate(`/messages?vendor=${vendor.id}`);
+    };
+
+    // Arriving from a chat's "Book" button (?book=1) opens the booking sheet straight away
+    useEffect(() => {
+        if (searchParams.get("book") === "1" && vendor && isAuthenticated && user?.role === "customer") {
+            setIsBookingOpen(true);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [vendor?.id, isAuthenticated]);
+
     const handleBookClick = () => {
         if (!isAuthenticated) {
             setIsAuthPromptOpen(true);
@@ -134,7 +173,7 @@ const VendorDetails = () => {
                 <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
                     <div className="flex items-center justify-between">
                         <Link to="/">
-                            <img src="/Plagohive.svg" alt="Plagohive" className="h-12 w-auto object-contain" />
+                            <img src="/Plagohive.svg" alt="Plagohive" className="w-auto object-contain h-7 sm:h-8" />
                         </Link>
                         <div className="flex items-center gap-4">
                             <Link to="/vendor-search">
@@ -148,13 +187,13 @@ const VendorDetails = () => {
                 </div>
             </header>
 
-            <main className="pt-24 pb-16">
+            <main className="pt-20 sm:pt-24 pb-28 md:pb-16">
                 {/* Cover Section */}
                 {(() => {
                     // Cover banner uses gallery images only; profile avatar uses profile_image_url separately
                     const coverImg = vendor.gallery_images?.[0] ?? null;
                     return (
-                        <div className="relative h-[300px] md:h-[400px] bg-gradient-to-r from-primary/20 via-primary/10 to-accent/20">
+                        <div className="relative h-[240px] md:h-[400px] bg-gradient-to-r from-primary/20 via-primary/10 to-accent/20">
                             {coverImg ? (
                                 <img
                                     src={coverImg}
@@ -164,10 +203,10 @@ const VendorDetails = () => {
                             ) : null}
                             <div className={`absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent ${coverImg ? "" : ""}`} />
 
-                            <div className="container mx-auto px-4 h-full flex items-end pb-8 relative z-10">
+                            <div className="container mx-auto px-4 h-full flex items-end pb-5 md:pb-8 relative z-10">
                                 <div className="flex flex-col md:flex-row md:items-end justify-between w-full gap-6">
-                                    <div className="flex items-end gap-6">
-                                        <div className="w-32 h-32 rounded-2xl bg-white shadow-2xl p-1 flex items-center justify-center -mb-16 md:mb-0 flex-shrink-0">
+                                    <div className="flex items-end gap-4 md:gap-6 min-w-0">
+                                        <div className="w-20 h-20 md:w-32 md:h-32 rounded-2xl bg-white shadow-xl p-1 flex items-center justify-center flex-shrink-0">
                                             {vendor.profile_image_url ? (
                                                 <img
                                                     src={vendor.profile_image_url}
@@ -176,14 +215,22 @@ const VendorDetails = () => {
                                                 />
                                             ) : (
                                                 <div className="w-full h-full bg-gradient-to-br from-primary/10 to-accent/10 rounded-xl flex items-center justify-center">
-                                                    {(() => { const Icon = getCategoryIcon(vendor.category); return <Icon className="h-12 w-12 text-primary/40" />; })()}
+                                                    {(() => { const Icon = getCategoryIcon(vendor.category); return <Icon className="h-8 w-8 md:h-12 md:w-12 text-primary/40" />; })()}
                                                 </div>
                                             )}
                                         </div>
-                                <div className="mb-2">
-                                    <Badge variant="secondary" className="mb-2 capitalize">{vendor.category}</Badge>
-                                    <h1 className="text-4xl font-bold text-foreground mb-2">{vendor.business_name}</h1>
-                                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                <div className="mb-1 md:mb-2 min-w-0">
+                                    <div className="flex flex-wrap items-center gap-1.5 mb-1.5 md:mb-2">
+                                        <Badge variant="secondary" className="capitalize">{vendor.category}</Badge>
+                                        <Badge className="bg-celebrate-emerald hover:bg-celebrate-emerald text-white gap-1">
+                                            <CheckCircle2 className="h-3 w-3" /> Verified
+                                        </Badge>
+                                    </div>
+                                    <div className="flex items-start gap-2">
+                                        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-1.5 md:mb-2 leading-tight flex-1 min-w-0">{vendor.business_name}</h1>
+                                        <FavoriteButton vendorId={vendor.id} className="flex-shrink-0 border border-border" />
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                                         <span className="flex items-center gap-1">
                                             <MapPin className="h-4 w-4" /> {vendor.location}
                                         </span>
@@ -191,13 +238,17 @@ const VendorDetails = () => {
                                             <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                                             {vendor.average_rating ? vendor.average_rating.toFixed(1) : "New"} ({reviews.length} reviews)
                                         </span>
+                                        <ResponseBadge hours={vendor.response_hours} />
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="flex gap-3">
+                            <div className="hidden md:flex gap-3">
                                 <Button variant="outline" onClick={handleShare}>
                                     <Share2 className="h-4 w-4 mr-2" /> Share
+                                </Button>
+                                <Button variant="outline" onClick={handleMessageClick}>
+                                    <MessageCircle className="h-4 w-4 mr-2" /> Message
                                 </Button>
                                 <Button size="lg" className="shadow-lg hover:shadow-primary/30" onClick={handleBookClick}>
                                     Book Now
@@ -209,7 +260,7 @@ const VendorDetails = () => {
                     );
                 })()}
 
-                <div className="container mx-auto px-4 pt-12">
+                <div className="container mx-auto px-4 pt-8 md:pt-12">
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         {/* Left Column - Details */}
                         <div className="lg:col-span-2 space-y-8">
@@ -222,24 +273,14 @@ const VendorDetails = () => {
                                 </Card>
                             </section>
 
+                            <VendorGallery images={vendor.gallery_images || []} name={vendor.business_name} />
+
                             <section className="animate-fade-in-up [animation-delay:200ms]">
                                 <h2 className="text-2xl font-bold mb-4">Services & Pricing</h2>
                                 {(serviceItems as any[]).length > 0 ? (
                                     <Card className="bg-white border border-border shadow-sm overflow-hidden">
-                                        {/* Base rate row — always at the top */}
-                                        <div className="flex items-center justify-between px-6 py-4 bg-primary/5 border-b border-border">
-                                            <div>
-                                                <p className="text-sm font-semibold text-foreground">Base Rate</p>
-                                                <p className="text-xs text-muted-foreground">Always included with every booking</p>
-                                            </div>
-                                            <span className="text-sm font-bold text-primary">
-                                                ₦{Number(vendor.starting_price).toLocaleString()}
-                                            </span>
-                                        </div>
-
-                                        {/* Add-on service items */}
                                         <div className="px-6 py-2 border-b border-border bg-muted/30">
-                                            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Add-on Services</p>
+                                            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Services</p>
                                         </div>
                                         <div className="divide-y divide-border">
                                             {(serviceItems as any[]).map((item: any) => (
@@ -252,7 +293,7 @@ const VendorDetails = () => {
                                                     </div>
                                                     <div className="text-right flex-shrink-0 ml-4">
                                                         <span className="text-sm font-bold text-primary">
-                                                            ₦{Number(item.unit_price).toLocaleString()}
+                                                            {formatNaira(item.unit_price)}
                                                         </span>
                                                         <span className="text-xs text-muted-foreground ml-1">/ {item.unit_label}</span>
                                                     </div>
@@ -262,7 +303,7 @@ const VendorDetails = () => {
                                         <div className="px-6 py-4 bg-muted/30 border-t border-border">
                                             <p className="text-xs text-muted-foreground flex items-center gap-1.5">
                                                 <CheckCircle2 className="h-3.5 w-3.5 text-green-500 flex-shrink-0" />
-                                                Your total = base rate + the services you select when booking
+                                                You only pay for the services you select when booking
                                             </p>
                                         </div>
                                     </Card>
@@ -273,7 +314,7 @@ const VendorDetails = () => {
                                                 <h3 className="font-semibold text-lg">Fixed Rate Service</h3>
                                                 <p className="text-sm text-muted-foreground">Flat fee — price covers the full service</p>
                                             </div>
-                                            <span className="text-2xl font-bold text-primary">₦{Number(vendor.starting_price).toLocaleString()}</span>
+                                            <span className="text-2xl font-bold text-primary">{formatNaira(vendor.starting_price)}</span>
                                         </div>
                                         <div className="space-y-2">
                                             {["Professional Service", "Quality Assurance", "Timely Delivery"].map((feature) => (
@@ -347,16 +388,19 @@ const VendorDetails = () => {
                                 <h3 className="font-bold text-lg mb-4">Book this Vendor</h3>
                                 <div className="space-y-3 mb-6">
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-muted-foreground">Base rate</span>
-                                        <span className="font-semibold">₦{Number(vendor.starting_price).toLocaleString()}</span>
+                                        <span className="text-muted-foreground">{(serviceItems as any[]).length > 0 ? "Prices from" : "Rate"}</span>
+                                        <span className="font-semibold">{formatNaira(vendor.starting_price)}</span>
                                     </div>
                                     <div className="flex justify-between text-sm">
                                         <span className="text-muted-foreground">Bookings</span>
                                         <span className="font-semibold">{reviews.length > 0 ? `${reviews.length} completed` : "Be the first"}</span>
                                     </div>
                                     <p className="text-[11px] text-muted-foreground bg-muted/50 rounded-lg px-3 py-2 leading-relaxed">
-                                        Base rate is always charged. Additional services you select are added on top.
+                                        {(serviceItems as any[]).length > 0
+                                            ? "Pick the services you need when booking — you only pay for what you select."
+                                            : "This vendor charges a fixed rate per booking."}
                                     </p>
+                                    <PolicySummary policyKey={vendor.cancellation_policy} compact />
                                 </div>
                                 <Button className="w-full shadow-lg" size="lg" onClick={handleBookClick}>
                                     Request Booking
@@ -371,6 +415,24 @@ const VendorDetails = () => {
                     </div>
                 </div>
             </main>
+
+            {/* Phone: the booking button stays in reach instead of sitting below the reviews */}
+            <div className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-border bg-white/95 backdrop-blur-md px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_-12px_rgba(0,0,0,0.15)]">
+                <div className="flex items-center gap-3">
+                    <div className="min-w-0 flex-1">
+                        <p className="text-[11px] text-muted-foreground leading-none mb-1">
+                            {(serviceItems as any[]).length > 0 ? "Prices from" : "Rate"}
+                        </p>
+                        <p className="text-lg font-bold text-primary leading-none">{formatNaira(vendor.starting_price)}</p>
+                    </div>
+                    <Button variant="outline" className="h-11 px-3.5 rounded-xl flex-shrink-0" onClick={handleMessageClick} aria-label="Message vendor">
+                        <MessageCircle className="h-4 w-4 mr-1.5" /> Ask
+                    </Button>
+                    <Button className="h-11 px-6 rounded-xl shadow-lg flex-shrink-0" onClick={handleBookClick}>
+                        Book now
+                    </Button>
+                </div>
+            </div>
 
             <BookingModal
                 isOpen={isBookingOpen}

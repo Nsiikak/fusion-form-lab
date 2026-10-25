@@ -2,10 +2,14 @@ import logging
 import smtplib
 import os
 import re
+import ssl
 import threading
+import time
 from datetime import datetime
+from email.mime.application import MIMEApplication
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.utils import formatdate, make_msgid, parseaddr
 from pathlib import Path
 import hashlib
 
@@ -13,19 +17,89 @@ logger = logging.getLogger(__name__)
 
 TEMPLATES_DIR = Path(__file__).parent.parent / "templates" / "email"
 
-SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USER = os.getenv("SMTP_USER", "")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
-FROM_NAME = os.getenv("EMAIL_FROM_NAME", "Plagohive")
-FROM_EMAIL = os.getenv("EMAIL_FROM_ADDRESS", SMTP_USER)
+# Settings are read when an email is sent (not at import), so .env changes and import order
+# can never leave the service silently unconfigured.
+def _settings() -> dict:
+    user = os.getenv("SMTP_USER", "").strip()
+    return {
+        "host": os.getenv("SMTP_HOST", "smtp.gmail.com").strip(),
+        "port": int(os.getenv("SMTP_PORT", "587") or 587),
+        "user": user,
+        # Gmail shows app passwords as "abcd efgh ijkl mnop" — the spaces aren't part of it
+        "password": re.sub(r"\s+", "", os.getenv("SMTP_PASSWORD", "")),
+        "from_name": os.getenv("EMAIL_FROM_NAME", "Plagohive").strip() or "Plagohive",
+        "from_email": (os.getenv("EMAIL_FROM_ADDRESS", "") or user).strip(),
+        "reply_to": os.getenv("EMAIL_REPLY_TO", "").strip(),
+    }
+
+
 FRONTEND_URL = os.getenv("FRONTEND_URL", "https://plagohive.netlify.app")
 
 
+def smtp_problems() -> list[str]:
+    """Configuration mistakes we can spot without connecting. Empty list = looks fine."""
+    s = _settings()
+    problems = []
+    if not s["user"] or not s["password"]:
+        problems.append("SMTP_USER and/or SMTP_PASSWORD are empty in backend/.env — no emails will be sent.")
+    if s["user"] and "@" not in s["user"]:
+        problems.append(f"SMTP_USER ({s['user']}) doesn't look like an email address.")
+    if "gmail" in s["host"] and s["user"] and s["from_email"].lower() != s["user"].lower():
+        problems.append(
+            f"EMAIL_FROM_ADDRESS ({s['from_email']}) differs from SMTP_USER ({s['user']}). Gmail will rewrite "
+            "the sender or mark mail as spam unless that address is a verified 'Send mail as' alias."
+        )
+    if "gmail" in s["host"] and s["password"] and len(s["password"]) != 16:
+        problems.append(
+            "SMTP_PASSWORD isn't 16 characters. Gmail needs an App Password (Google Account → Security → "
+            "2-Step Verification → App passwords), not your normal Gmail password."
+        )
+    if s["port"] not in (465, 587, 25, 2525):
+        problems.append(f"SMTP_PORT {s['port']} is unusual — Gmail uses 587 (STARTTLS) or 465 (SSL).")
+    return problems
+
+
+def _explain(exc: Exception) -> str:
+    """Turn SMTP errors into something actionable."""
+    text = str(exc)
+    if isinstance(exc, smtplib.SMTPAuthenticationError):
+        return (
+            "Login rejected. For Gmail, SMTP_PASSWORD must be an App Password (needs 2-Step Verification). "
+            "App passwords are revoked whenever the Google account password changes — create a new one. "
+            f"[{text[:160]}]"
+        )
+    if "5.4.5" in text or "Daily user sending limit" in text or "quota" in text.lower():
+        return f"Gmail's daily sending limit has been reached (about 500/day); it resets within 24 hours. [{text[:160]}]"
+    if isinstance(exc, smtplib.SMTPSenderRefused):
+        return f"Sender address refused — EMAIL_FROM_ADDRESS must be the SMTP account or a verified alias. [{text[:160]}]"
+    if isinstance(exc, smtplib.SMTPRecipientsRefused):
+        return f"Recipient address refused. [{text[:160]}]"
+    if isinstance(exc, (TimeoutError, OSError)) and not isinstance(exc, smtplib.SMTPException):
+        return f"Couldn't reach the SMTP server — check SMTP_HOST/SMTP_PORT and that outbound SMTP isn't blocked by your network or host. [{text[:160]}]"
+    return text[:300]
+
+
+def _html_to_text(html: str) -> str:
+    """Plain-text alternative. Mail clients and spam filters expect one alongside HTML."""
+    text = re.sub(r"(?is)<(style|script|head).*?</\1>", "", html)
+    text = re.sub(r'(?is)<a [^>]*href="([^"]+)"[^>]*>(.*?)</a>', r"\2 (\1)", text)
+    text = re.sub(r"(?i)<br\s*/?>|</p>|</tr>|</h[1-6]>", "\n", text)
+    text = re.sub(r"<[^>]+>", "", text)
+    text = re.sub(r"&nbsp;", " ", text)
+    text = re.sub(r"&amp;", "&", text)
+    text = re.sub(r"[ \t]+", " ", text)
+    text = re.sub(r"\n\s*\n+", "\n\n", text)
+    return text.strip()
+
+
 def _render(template: str, **kwargs) -> str:
-    """Safe template renderer. Replaces {key} placeholders without touching CSS { } blocks."""
+    """Safe template renderer. Replaces {key} placeholders without touching CSS { } blocks.
+    Every value is HTML-escaped (names, notes and other user text can't inject markup), except
+    keys ending in _html, which we build ourselves from already-escaped parts."""
+    import html as _h
     for key, value in kwargs.items():
-        template = template.replace("{" + key + "}", str(value))
+        text = str(value) if key.endswith("_html") else _h.escape(str(value), quote=True)
+        template = template.replace("{" + key + "}", text)
     return template
 
 
@@ -41,38 +115,116 @@ def _unsubscribe_token(email: str) -> str:
     return hashlib.sha256(f"{email}:{secret}".encode()).hexdigest()[:32]
 
 
-def _send(to_email: str, subject: str, html: str) -> bool:
-    if not SMTP_USER or not SMTP_PASSWORD:
-        logger.warning("SMTP not configured — skipping email to %s [%s]", to_email, subject)
-        return False
+def _deliver(s: dict, to_email: str, msg: MIMEMultipart) -> None:
+    context = ssl.create_default_context()
+    if s["port"] == 465:
+        with smtplib.SMTP_SSL(s["host"], s["port"], timeout=20, context=context) as server:
+            server.login(s["user"], s["password"])
+            server.sendmail(s["from_email"], [to_email], msg.as_string())
+    else:
+        with smtplib.SMTP(s["host"], s["port"], timeout=20) as server:
+            server.ehlo()
+            server.starttls(context=context)
+            server.ehlo()
+            server.login(s["user"], s["password"])
+            server.sendmail(s["from_email"], [to_email], msg.as_string())
+
+
+TRANSIENT = (smtplib.SMTPServerDisconnected, smtplib.SMTPConnectError, TimeoutError, ConnectionError)
+
+
+def send_email(to_email: str, subject: str, html: str, attachments=None) -> tuple[bool, str]:
+    """Send one email. Returns (ok, message) — message explains any failure.
+    Retries once on connection problems; never retries a rejected login.
+    attachments: optional list of (filename, bytes) — PDFs such as receipts."""
+    html = html.replace("{sent_stamp}", "")   # stamped by _send; direct callers just drop the placeholder
+    s = _settings()
+    if not s["user"] or not s["password"]:
+        msg = "SMTP not configured (SMTP_USER / SMTP_PASSWORD empty in backend/.env)"
+        logger.warning("%s — skipped email to %s [%s]", msg, to_email, subject)
+        return False, msg
+
+    msg = MIMEMultipart("mixed")
+    msg["Subject"] = subject
+    msg["From"] = f"{s['from_name']} <{s['from_email']}>"
+    msg["To"] = to_email
+    msg["Date"] = formatdate(localtime=True)
+    msg["Message-ID"] = make_msgid(domain=(parseaddr(s["from_email"])[1].split("@")[-1] or "plagohive.com"))
+    if s["reply_to"]:
+        msg["Reply-To"] = s["reply_to"]
+    body = MIMEMultipart("alternative")
+    body.attach(MIMEText(_html_to_text(html), "plain", "utf-8"))
+    body.attach(MIMEText(html, "html", "utf-8"))
+    msg.attach(body)
+    for filename, data in attachments or []:
+        part = MIMEApplication(data, _subtype="pdf" if filename.lower().endswith(".pdf") else "octet-stream")
+        part.add_header("Content-Disposition", "attachment", filename=filename)
+        msg.attach(part)
+
+    for attempt in (1, 2):
+        try:
+            _deliver(s, to_email, msg)
+            logger.info("Email sent to %s: %s", to_email, subject)
+            return True, "sent"
+        except TRANSIENT as exc:
+            if attempt == 1:
+                time.sleep(2)
+                continue
+            reason = _explain(exc)
+        except Exception as exc:
+            reason = _explain(exc)
+        logger.error("Email to %s failed (%s): %s", to_email, subject, reason)
+        return False, reason
+    return False, "unknown error"
+
+
+def _send(to_email: str, subject: str, html: str, attachments=None) -> bool:
+    """Every email carries its send time and a reference, and is recorded in the notification log."""
+    import secrets
+    from datetime import timedelta, timezone
+    ref = f"N-{secrets.token_hex(5).upper()}"
+    # WAT is UTC+1 all year (no daylight saving). A fixed offset needs no time-zone database,
+    # which Windows Python doesn't ship with — looking up "Africa/Lagos" broke every email there.
+    stamp = datetime.now(timezone(timedelta(hours=1))).strftime("%d %b %Y, %H:%M WAT")
+    html = html.replace("{sent_stamp}", f"Sent {stamp} \u00b7 Ref {ref}")
+    ok, msg = send_email(to_email, subject, html, attachments)
     try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"] = f"{FROM_NAME} <{FROM_EMAIL}>"
-        msg["To"] = to_email
-        msg.attach(MIMEText(html, "html", "utf-8"))
+        from app.entities.audit import log_notification
+        log_notification("email", to_email, subject, ok, "" if ok else msg, ref, body=html)
+    except Exception as exc:   # the audit log must never stop an email
+        logger.error("Notification log failed: %s", exc)
+    return ok
 
-        if SMTP_PORT == 465:
-            with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, timeout=15) as server:
-                server.login(SMTP_USER, SMTP_PASSWORD)
-                server.sendmail(FROM_EMAIL, [to_email], msg.as_string())
+
+def _fire_and_forget(fn, *args, **kwargs):
+    """Run an email send in a background thread so it never blocks the request.
+    Anything that goes wrong (missing template, SMTP error) is logged, never lost."""
+    def runner():
+        try:
+            fn(*args, **kwargs)
+        except Exception:
+            logger.exception("Email task %s failed", getattr(fn, "__name__", fn))
+
+    threading.Thread(target=runner, daemon=True, name=f"email-{getattr(fn, '__name__', 'send')}").start()
+
+
+def check_smtp_login() -> tuple[bool, str]:
+    """Connect and log in without sending anything. Used at startup and by check_email.py."""
+    s = _settings()
+    if not s["user"] or not s["password"]:
+        return False, "SMTP_USER / SMTP_PASSWORD are empty"
+    try:
+        context = ssl.create_default_context()
+        if s["port"] == 465:
+            with smtplib.SMTP_SSL(s["host"], s["port"], timeout=15, context=context) as server:
+                server.login(s["user"], s["password"])
         else:
-            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
-                server.ehlo()
-                server.starttls()
-                server.login(SMTP_USER, SMTP_PASSWORD)
-                server.sendmail(FROM_EMAIL, [to_email], msg.as_string())
-
-        logger.info("Email sent to %s: %s", to_email, subject)
-        return True
+            with smtplib.SMTP(s["host"], s["port"], timeout=15) as server:
+                server.ehlo(); server.starttls(context=context); server.ehlo()
+                server.login(s["user"], s["password"])
+        return True, f"logged in to {s['host']}:{s['port']} as {s['user']}"
     except Exception as exc:
-        logger.error("Email delivery failed to %s (%s): %s", to_email, subject, exc)
-        return False
-
-
-def _fire_and_forget(fn, *args):
-    """Run an email send in a daemon thread so it never blocks the request."""
-    threading.Thread(target=fn, args=args, daemon=True).start()
+        return False, _explain(exc)
 
 
 def _base_vars(email: str) -> dict:
@@ -88,271 +240,172 @@ def _base_vars(email: str) -> dict:
 # Public functions — one per email type
 # ─────────────────────────────────────────────
 
+# ── Every email uses the same branded layout (notice.html) ─────────────────────
+# Booking emails add a details table; all user text is escaped in send_notice_email.
+
 def send_welcome_email(email: str, full_name: str) -> bool:
-    first_name = (full_name or email).split()[0].capitalize()
-    html = _render(
-        _load_template("welcome.html"),
-        first_name=first_name,
-        **_base_vars(email),
-    )
-    return _send(email, f"Welcome to Plagohive, {first_name}! 🎉", html)
+    first = (full_name or email).split()[0].capitalize()
+    return send_notice_email(email, full_name, f"Welcome to Plagohive, {first}! \U0001F389", "Welcome", "You're in.",
+        ["Plagohive is the safe way to book event vendors in Nigeria: verified caterers, decorators, DJs and more.",
+         "When you book, your payment is held until your event is done. If a vendor cancels or doesn't show, you get every naira back."],
+        "Find vendors", "/vendor-search")
 
 
 def send_vendor_welcome_email(email: str, full_name: str, business_name: str) -> bool:
-    first_name = (full_name or email).split()[0].capitalize()
-    html = _render(
-        _load_template("vendor_welcome.html"),
-        first_name=first_name,
-        business_name=business_name,
-        **_base_vars(email),
-    )
-    return _send(email, f"Your Plagohive vendor profile is under review — {business_name}", html)
+    return send_notice_email(email, full_name, f"Your Plagohive vendor profile is under review — {business_name}", "Vendor sign-up",
+        f"Thanks for joining, {business_name}",
+        ["We're checking your details (including your CAC registration). Most reviews finish within 1–2 working days.",
+         "Meanwhile, finish your profile: add photos, your services and prices, your logistics fee and your bank account for payouts.",
+         "Once you're verified, customers can book you and pay safely. You're paid after each event."],
+        "Complete my profile", "/profile")
 
 
 def send_login_notification(email: str, full_name: str, role: str) -> bool:
-    first_name = (full_name or email).split()[0].capitalize()
-    login_time = datetime.now().strftime("%d %b %Y at %I:%M %p")
-    html = _render(
-        _load_template("login_notification.html"),
-        first_name=first_name,
-        login_time=login_time,
-        role=role,
-        **_base_vars(email),
-    )
-    return _send(email, "New sign-in to your Plagohive account", html)
+    when = datetime.now().strftime("%d %b %Y, %H:%M")
+    return send_notice_email(email, full_name, "New sign-in to your Plagohive account", "Security", "New sign-in",
+        [f"Your account was signed in on {when}.",
+         "If this was you, there's nothing to do. If not, reset your password straight away."],
+        "Reset password", "/forgot-password")
 
 
-def send_booking_confirmation_to_customer(
-    customer_email: str,
-    customer_name: str,
-    booking_id: int,
-    vendor_name: str,
-    vendor_category: str,
-    event_date: str,
-    event_time: str,
-    amount: str,
-) -> bool:
-    first_name = (customer_name or customer_email).split()[0].capitalize()
-    html = _render(
-        _load_template("booking_confirmation_customer.html"),
-        first_name=first_name,
-        booking_id=booking_id,
-        vendor_name=vendor_name,
-        vendor_category=vendor_category,
-        event_date=event_date,
-        event_time=event_time,
-        amount=amount,
-        **_base_vars(customer_email),
-    )
-    return _send(customer_email, f"Booking request sent to {vendor_name} ✅", html)
+def send_booking_confirmation_to_customer(customer_email, customer_name, booking_id, vendor_name, vendor_category,
+                                          event_date, event_time, amount, attachments=None) -> bool:
+    return send_notice_email(customer_email, customer_name, f"Booking request sent to {vendor_name}", "Booking received",
+        "Your payment is held safely",
+        [f"We've sent your request to {vendor_name}. You'll get an email when they accept.",
+         "If they decline or don't respond within 48 hours, you're refunded in full automatically. Your receipt is attached."],
+        "View my booking", "/customer-dashboard", attachments=attachments,
+        details=[("Booking", f"#{booking_id}"), ("Vendor", f"{vendor_name} ({vendor_category})"),
+                 ("Date", f"{event_date}{(' at ' + event_time) if event_time else ''}"), ("Paid", f"\u20a6{amount}")])
 
 
-def send_booking_request_to_vendor(
-    vendor_email: str,
-    vendor_name: str,
-    vendor_full_name: str,
-    booking_id: int,
-    customer_name: str,
-    customer_phone: str,
-    event_date: str,
-    event_time: str,
-    amount: str,
-    notes: str,
-    business_name: str,
-) -> bool:
-    vendor_first_name = (vendor_full_name or vendor_email).split()[0].capitalize()
-    html = _render(
-        _load_template("booking_request_vendor.html"),
-        vendor_first_name=vendor_first_name,
-        business_name=business_name,
-        booking_id=booking_id,
-        customer_name=customer_name,
-        customer_phone=customer_phone or "Not provided",
-        event_date=event_date,
-        event_time=event_time or "To be confirmed",
-        amount=amount,
-        notes=notes or "No additional notes.",
-        vendor_name=vendor_name,
-        **_base_vars(vendor_email),
-    )
-    return _send(vendor_email, f"🔔 New booking request — {customer_name}", html)
+def send_booking_request_to_vendor(vendor_email, vendor_name, vendor_full_name, booking_id, customer_name, customer_phone,
+                                   event_date, event_time, amount, notes, business_name) -> bool:
+    return send_notice_email(vendor_email, vendor_full_name or vendor_name, f"New booking request — {customer_name}",
+        "New booking", "A customer has booked and paid",
+        ["The payment is held by Plagohive. Accept or decline within 48 hours, or the customer is refunded automatically.",
+         "You're paid after the event, once the customer confirms (or 24 hours after you mark it complete)."],
+        "Review request", "/vendor-dashboard",
+        details=[("Booking", f"#{booking_id}"), ("Customer", customer_name),
+                 ("Date", f"{event_date}{(' at ' + event_time) if event_time else ''}"), ("Your price", f"\u20a6{amount}"),
+                 ("Notes", notes or "—")])
 
 
-def send_booking_accepted_to_customer(
-    customer_email: str,
-    customer_name: str,
-    booking_id: int,
-    vendor_name: str,
-    vendor_category: str,
-    event_date: str,
-    amount: str,
-) -> bool:
-    first_name = (customer_name or customer_email).split()[0].capitalize()
-    html = _render(
-        _load_template("booking_accepted.html"),
-        first_name=first_name,
-        booking_id=booking_id,
-        vendor_name=vendor_name,
-        vendor_category=vendor_category,
-        event_date=event_date,
-        amount=amount,
-        **_base_vars(customer_email),
-    )
-    return _send(customer_email, f"🎉 {vendor_name} accepted your booking!", html)
+def send_booking_accepted_to_customer(customer_email, customer_name, booking_id, vendor_name, vendor_category,
+                                      event_date, amount) -> bool:
+    return send_notice_email(customer_email, customer_name, f"{vendor_name} accepted your booking!", "Booking confirmed",
+        "You're all set",
+        [f"{vendor_name} has accepted your booking. Your money stays held until you confirm the service.",
+         "A week before the event we'll check in with you both, and you'll see each other's phone numbers once they reconfirm."],
+        "View my booking", "/customer-dashboard",
+        details=[("Booking", f"#{booking_id}"), ("Vendor", f"{vendor_name} ({vendor_category})"), ("Date", event_date),
+                 ("Paid", f"\u20a6{amount}")])
 
 
-def send_booking_declined_to_customer(
-    customer_email: str,
-    customer_name: str,
-    booking_id: int,
-    vendor_name: str,
-    event_date: str,
-) -> bool:
-    first_name = (customer_name or customer_email).split()[0].capitalize()
-    html = _render(
-        _load_template("booking_declined.html"),
-        first_name=first_name,
-        booking_id=booking_id,
-        vendor_name=vendor_name,
-        event_date=event_date,
-        **_base_vars(customer_email),
-    )
-    return _send(customer_email, f"Booking update from {vendor_name}", html)
+def send_booking_declined_to_customer(customer_email, customer_name, booking_id, vendor_name, event_date) -> bool:
+    return send_notice_email(customer_email, customer_name, f"Booking update from {vendor_name}", "Booking update",
+        "Your full refund is on its way",
+        [f"{vendor_name} couldn't take your booking for {event_date}. We've started a full refund, including our fee.",
+         "Refunds usually reach your card or account within 5–10 working days. Plenty of other verified vendors are ready to help."],
+        "Find another vendor", "/vendor-search", details=[("Booking", f"#{booking_id}")])
 
 
 def send_vendor_approved_email(email: str, full_name: str, business_name: str) -> bool:
-    first_name = (full_name or email).split()[0].capitalize()
-    html = _render(
-        _load_template("vendor_approved.html"),
-        first_name=first_name,
-        business_name=business_name,
-        **_base_vars(email),
-    )
-    return _send(email, f"🏆 Congratulations! {business_name} is now Plagohive Verified", html)
+    return send_notice_email(email, full_name, f"{business_name} is now Plagohive Verified", "Verified",
+        "You're verified and live",
+        ["Customers can now find and book you. Your verified badge shows on your profile and in search.",
+         "Tip: download your \"Verified · Now accepting bookings\" card from your dashboard and share it on Instagram and WhatsApp."],
+        "Open my dashboard", "/vendor-dashboard")
 
 
 def send_password_reset_email(email: str, full_name: str, token: str) -> bool:
-    first_name = (full_name or email).split()[0].capitalize()
-    frontend_url = FRONTEND_URL
-    reset_url = f"{frontend_url}/reset-password?token={token}"
-    html = _render(
-        _load_template("password_reset.html"),
-        first_name=first_name,
-        reset_url=reset_url,
-        **_base_vars(email),
-    )
-    return _send(email, "Reset your Plagohive password", html)
+    return send_notice_email(email, full_name, "Reset your Plagohive password", "Security", "Reset your password",
+        ["Tap the button below to choose a new password. The link works once and expires in 1 hour.",
+         "If you didn't ask for this, you can ignore this email; your password won't change."],
+        "Choose a new password", f"/reset-password?token={token}")
 
 
-def send_completion_pending_to_customer(
-    customer_email: str,
-    customer_name: str,
-    booking_id: int,
-    vendor_name: str,
-    event_date: str,
-    amount: str,
-) -> bool:
-    """Notify customer that vendor marked the event complete and payment will auto-release in 24h."""
-    first_name = (customer_name or customer_email).split()[0].capitalize()
-    dashboard_url = f"{FRONTEND_URL}/customer-dashboard"
-    html = f"""<!DOCTYPE html><html><body style="font-family:sans-serif;color:#1a1a2e;max-width:600px;margin:0 auto;padding:20px">
-<h2 style="color:#6c47ff">Your vendor has marked the event complete</h2>
-<p>Hi {first_name},</p>
-<p><strong>{vendor_name}</strong> has marked Booking <strong>#{booking_id}</strong> (event on {event_date}) as complete and your payment of <strong>₦{amount}</strong> is now held in escrow.</p>
-<p><strong>What happens next:</strong></p>
-<ul>
-<li>If you confirm the event went well, payment is released to {vendor_name} immediately.</li>
-<li>If you take no action within <strong>24 hours</strong>, payment is automatically released to the vendor.</li>
-<li>If you have a dispute, please contact Plagohive support before confirming.</li>
-</ul>
-<p style="margin:24px 0"><a href="{dashboard_url}" style="background:#6c47ff;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">Confirm or Review Booking</a></p>
-<p style="color:#888;font-size:12px">Plagohive &copy; {datetime.now().year}</p>
-</body></html>"""
-    return _send(customer_email, f"Action required: Confirm your event with {vendor_name}", html)
+def send_completion_pending_to_customer(customer_email, customer_name, booking_id, vendor_name, event_date, amount) -> bool:
+    """Vendor marked the event complete; payment auto-releases in 24 hours unless the customer reports a problem."""
+    return send_notice_email(customer_email, customer_name, f"Action required: confirm your event with {vendor_name}",
+        "Confirm the service", f"Did {vendor_name} deliver?",
+        [f"{vendor_name} has marked your event on {event_date} as complete.",
+         "If everything went well, confirm it so they're paid. If something went wrong, report a problem and we'll hold the payment while we look into it.",
+         "If you do nothing, the payment is released automatically in 24 hours."],
+        "Confirm or report a problem", "/customer-dashboard",
+        details=[("Booking", f"#{booking_id}"), ("Vendor", vendor_name), ("Amount held", f"\u20a6{amount}")])
 
 
-def send_cac_verification_email(
+def send_cac_verification_email(email: str, full_name: str, business_name: str, verified: bool,
+                                cac_verified_name: str | None = None) -> bool:
+    """CAC verification outcome (automatic or manual)."""
+    if verified:
+        return send_notice_email(email, full_name, f"CAC verified — {business_name} is now Plagohive Verified",
+            "CAC verification", "Your business is verified",
+            [f"We matched {business_name} with the Corporate Affairs Commission (CAC) register.",
+             "Your verified badge is now live and customers can book you."],
+            "Open my dashboard", "/vendor-dashboard",
+            details=[("Matched CAC record", cac_verified_name)] if cac_verified_name else None)
+    if cac_verified_name:
+        return send_notice_email(email, full_name, "CAC verification update — manual review", "CAC verification",
+            "We're checking one detail",
+            [f"We found your RC number, but the registered name is slightly different from {business_name}.",
+             "Our team will review it, usually within 1–2 working days. You don't need to do anything unless we contact you."],
+            "Open my dashboard", "/vendor-dashboard", details=[("Name on the CAC register", cac_verified_name)])
+    return send_notice_email(email, full_name, "CAC verification update — action required", "CAC verification",
+        "We couldn't verify your RC number",
+        [f"We couldn't find the RC number for {business_name} on the CAC register.",
+         "Check it for typos on your profile and tap Re-verify on your dashboard. If you're not CAC-registered yet, contact us and we'll help."],
+        "Update my details", "/profile")
+
+
+def send_review_request(customer_email, customer_name, booking_id, vendor_name, event_date) -> bool:
+    return send_notice_email(customer_email, customer_name, f"How was your event with {vendor_name}?", "Review",
+        "Tell others how it went",
+        [f"Thanks for booking {vendor_name} for {event_date}. A quick review helps other customers choose, and helps good vendors grow.",
+         "It takes less than a minute."],
+        "Leave a review", f"/vendors/review?booking_id={booking_id}")
+
+
+
+def send_notice_email(
     email: str,
     full_name: str,
-    business_name: str,
-    verified: bool,
-    cac_verified_name: str | None = None,
+    subject: str,
+    eyebrow: str,
+    heading: str,
+    paragraphs: list[str],
+    cta_text: str = "Open Plagohive",
+    cta_path: str = "/",
+    attachments=None,
+    details=None,
 ) -> bool:
-    """Notify vendor of their CAC verification outcome (both auto and manual)."""
+    """Generic branded notice. Every paragraph is HTML-escaped, so user-written text
+    (dispute reasons, admin notes) is safe to pass in."""
+    import html as _html
+
     first_name = (full_name or email).split()[0].capitalize()
-    dashboard_url = f"{FRONTEND_URL}/vendor-dashboard"
-
-    if verified:
-        subject = f"✅ CAC Verified — {business_name} is now Plagohive Verified"
-        status_block = f"""
-<p>Great news, {first_name}!</p>
-<p>Your business <strong>{business_name}</strong> has been automatically verified against the
-Corporate Affairs Commission (CAC) database.</p>
-{"<p>Matched CAC record: <strong>" + cac_verified_name + "</strong></p>" if cac_verified_name else ""}
-<h3>What this means:</h3>
-<ul>
-  <li>Your vendor profile is now <strong>Verified ✓</strong> and visible to customers.</li>
-  <li>You can start receiving booking requests immediately.</li>
-  <li>Add service items and bank details to complete your setup and receive payouts.</li>
-</ul>"""
-    elif cac_verified_name:
-        subject = f"CAC Verification Update — Manual Review Required"
-        status_block = f"""
-<p>Hi {first_name},</p>
-<p>We found your RC number in the CAC database, but there is a slight name mismatch between your
-registered name (<strong>{business_name}</strong>) and the CAC record
-(<strong>{cac_verified_name}</strong>).</p>
-<h3>What happens next:</h3>
-<ul>
-  <li>Our team will review your application manually within <strong>48 hours</strong>.</li>
-  <li>You will receive another email once your verification is updated.</li>
-  <li>If you believe this is an error, please update your business name to match the CAC record exactly.</li>
-</ul>"""
-    else:
-        subject = f"CAC Verification Update — Action Required"
-        status_block = f"""
-<p>Hi {first_name},</p>
-<p>We were unable to automatically verify your RC number for <strong>{business_name}</strong> in the
-CAC database.</p>
-<h3>What to do next:</h3>
-<ul>
-  <li>Double-check your RC Number is correct (format: RC1234567).</li>
-  <li>Update your profile if there is a typo, then click "Re-verify" on your dashboard.</li>
-  <li>Our team will also review your application manually within <strong>48 hours</strong>.</li>
-</ul>"""
-
-    html = f"""<!DOCTYPE html>
-<html><body style="font-family:sans-serif;color:#1a1a2e;max-width:600px;margin:0 auto;padding:20px">
-<div style="border-left:4px solid #6c47ff;padding-left:16px;margin-bottom:20px">
-  <h2 style="color:#6c47ff;margin:0">CAC Verification Update</h2>
-</div>
-{status_block}
-<p style="margin:24px 0">
-  <a href="{dashboard_url}" style="background:#6c47ff;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600">
-    Go to Dashboard
-  </a>
-</p>
-<p style="color:#888;font-size:12px">Plagohive &copy; {datetime.now().year} &middot; Questions? Reply to this email.</p>
-</body></html>"""
-    return _send(email, subject, html)
-
-
-def send_review_request(
-    customer_email: str,
-    customer_name: str,
-    booking_id: int,
-    vendor_name: str,
-    event_date: str,
-) -> bool:
-    first_name = (customer_name or customer_email).split()[0].capitalize()
-    review_url = f"{FRONTEND_URL}/vendors/review?booking_id={booking_id}"
-    html = _render(
-        _load_template("review_request.html"),
-        first_name=first_name,
-        booking_id=booking_id,
-        vendor_name=vendor_name,
-        event_date=event_date,
-        review_url=review_url,
-        **_base_vars(customer_email),
+    body_html = "".join(
+        '<p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#52525B;">'
+        + _html.escape(p).replace("\n", "<br />")
+        + "</p>"
+        for p in [f"Hi {first_name},", *paragraphs]
     )
-    return _send(customer_email, f"How was your event with {vendor_name}? Leave a review ⭐", html)
+    if details:
+        rows = "".join(
+            f'<tr><td style="padding:8px 0;font-size:13px;color:#71717A;width:38%;vertical-align:top;">{_html.escape(str(k))}</td>'
+            f'<td style="padding:8px 0;font-size:14px;color:#13213C;font-weight:600;">{_html.escape(str(v))}</td></tr>'
+            for k, v in details if v not in (None, "")
+        )
+        body_html += ('<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" '
+                      'style="margin:4px 0 20px;border-top:1px solid #F3DDBF;border-bottom:1px solid #F3DDBF;">' + rows + '</table>')
+    html_doc = _render(
+        _load_template("notice.html"),
+        eyebrow=eyebrow,
+        heading=heading,
+        body_html=body_html,
+        cta_text=cta_text,
+        cta_url=f"{FRONTEND_URL}{cta_path}",
+        **_base_vars(email),
+    )
+    return _send(email, subject, html_doc, attachments)

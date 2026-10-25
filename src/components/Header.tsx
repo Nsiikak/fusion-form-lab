@@ -24,7 +24,8 @@ export const Header = () => {
     setIsMenuOpen(false);
   };
 
-  const dashboardPath = user?.role === "vendor" ? "/vendor-dashboard" : "/customer-dashboard";
+  const dashboardPath =
+    user?.role === "admin" ? "/admin" : user?.role === "support" ? "/support" : user?.role === "vendor" ? "/vendor-dashboard" : "/customer-dashboard";
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -59,7 +60,7 @@ export const Header = () => {
             <img
               src="/Plagohive.svg"
               alt="Plagohive"
-              className="h-14 md:h-16 w-auto block object-contain"
+              className="w-auto block object-contain h-7 sm:h-8"
               loading="lazy"
             />
           </Link>

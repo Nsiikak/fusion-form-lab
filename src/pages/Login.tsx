@@ -44,6 +44,10 @@ const Login = () => {
       toast.success("Welcome back!");
       if (redirect) {
         navigate(redirect);
+      } else if (user.role === "admin") {
+        navigate("/admin");
+      } else if (user.role === "support") {
+        navigate("/support");
       } else if (user.role === "vendor") {
         navigate("/vendor-dashboard");
       } else {
@@ -59,7 +63,7 @@ const Login = () => {
   return (
     <div className="min-h-screen flex font-sans">
       {/* ── Left panel – dark brand canvas ── */}
-      <div className="hidden lg:flex lg:w-[52%] bg-[#0D1B2A] flex-col justify-between p-14 relative overflow-hidden">
+      <div className="hidden lg:flex lg:w-[52%] bg-navy flex-col justify-between p-14 relative overflow-hidden">
 
         {/* Geometric background – hive-inspired hexagons */}
         <svg
@@ -98,20 +102,20 @@ const Login = () => {
         />
         <div
           className="absolute bottom-[-60px] left-[-60px] w-[260px] h-[260px] rounded-full opacity-15 pointer-events-none"
-          style={{ background: "radial-gradient(circle, hsl(210 79% 42%) 0%, transparent 70%)" }}
+          style={{ background: "radial-gradient(circle, hsl(29 89% 48%) 0%, transparent 70%)" }}
         />
 
         {/* Logo */}
         <div className="relative z-10">
           <Link to="/" className="inline-flex">
-            <img src="/Plagohive.svg" alt="Plagohive" className="h-9 w-auto block object-contain" style={{ filter: "brightness(0) invert(1)" }} />
+            <img src="/Plagohive.svg" alt="Plagohive" className="w-auto block object-contain h-7 sm:h-8" style={{ filter: "brightness(0) invert(1)" }} />
           </Link>
         </div>
 
         {/* Main copy */}
         <div className="relative z-10">
           <p className="text-accent text-sm font-bold uppercase tracking-widest mb-5">
-            Africa's Event Marketplace
+            Nigeria's protected event marketplace
           </p>
           <h2
             className="font-display font-extrabold text-white leading-[1.05] mb-7"
@@ -120,23 +124,24 @@ const Login = () => {
             Plan events<br />people will never<br />stop talking about.
           </h2>
 
-          <div className="flex flex-col gap-4 mb-12">
+          <ul className="flex flex-col gap-4 mb-12">
             {[
-              { stat: "1,000+", label: "Verified vendors" },
-              { stat: "5,000+", label: "Events planned" },
-              { stat: "4.8★",   label: "Average rating" },
-            ].map((s) => (
-              <div key={s.label} className="flex items-center gap-4">
-                <span className="font-display text-2xl font-extrabold text-white">{s.stat}</span>
-                <span className="text-white/40 text-sm">{s.label}</span>
-              </div>
+              "Every vendor verified before they're listed",
+              "Your money is held until your event is done",
+              "Full refund if a vendor cancels or doesn't show",
+              "Reviews only from real bookings",
+            ].map((text) => (
+              <li key={text} className="flex items-start gap-3">
+                <span className="mt-1 h-5 w-5 flex-shrink-0 rounded-full bg-celebrate-emerald text-white text-xs font-bold flex items-center justify-center">&#10003;</span>
+                <span className="text-white/75 text-[15px] leading-snug">{text}</span>
+              </li>
             ))}
-          </div>
+          </ul>
 
           {/* Trust strip */}
           <div className="border-t border-white/10 pt-6">
             <p className="text-white/30 text-xs font-medium uppercase tracking-widest">
-              Secure · Verified · Africa-first
+              Payments by Paystack · Built in Lagos
             </p>
           </div>
         </div>
@@ -153,7 +158,7 @@ const Login = () => {
         <div className="flex items-center justify-between px-8 md:px-14 py-6">
           {/* Mobile logo */}
           <Link to="/" className="lg:hidden inline-flex">
-            <img src="/Plagohive.svg" alt="Plagohive" className="h-10 w-auto block object-contain" />
+            <img src="/Plagohive.svg" alt="Plagohive" className="w-auto block object-contain h-7 sm:h-8" />
           </Link>
           <div className="hidden lg:block" />
 

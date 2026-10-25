@@ -38,6 +38,7 @@ class EventService:
             location=event_data.location,
             description=event_data.description,
             total_budget=event_data.total_budget,
+            event_type=getattr(event_data, "event_type", None),
             status=EventStatus.PLANNING
         )
         
@@ -109,6 +110,6 @@ class EventService:
         
         return {
             "booking_count": len(confirmed_bookings),
-            "total_cost": sum(Decimal(str(b.price)) for b in confirmed_bookings)
+            "total_cost": sum(Decimal(str(b.customer_total if b.customer_total is not None else b.price)) for b in confirmed_bookings)
         }
 

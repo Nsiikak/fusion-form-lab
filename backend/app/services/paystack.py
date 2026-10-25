@@ -1,95 +1,186 @@
-import requests
+import hashlib
+import hmac
+import logging
 import os
+from decimal import Decimal
+from typing import Optional
+
+import requests
 from fastapi import HTTPException, status
+
+logger = logging.getLogger(__name__)
+
+TIMEOUT_SECONDS = 15
+
+
+class PaystackError(Exception):
+    """Raised when Paystack rejects a request or cannot be reached."""
+
+
+def _mask(value: str, keep: int = 4) -> str:
+    value = str(value or "")
+    return "*" * max(len(value) - keep, 0) + value[-keep:]
+
 
 class PaystackService:
     BASE_URL = "https://api.paystack.co"
-    
+
     @property
-    def headers(self):
-        secret_key = os.getenv("PAYSTACK_SECRET_KEY")
-        if not secret_key:
+    def secret_key(self) -> str:
+        key = os.getenv("PAYSTACK_SECRET_KEY", "")
+        if not key:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Paystack secret key not configured"
+                detail="Payment provider is not configured",
             )
+        return key
+
+    @property
+    def headers(self) -> dict:
         return {
-            "Authorization": f"Bearer {secret_key}",
-            "Content-Type": "application/json"
+            "Authorization": f"Bearer {self.secret_key}",
+            "Content-Type": "application/json",
         }
 
-    def verify_transaction(self, reference: str):
-        url = f"{self.BASE_URL}/transaction/verify/{reference}"
-        response = requests.get(url, headers=self.headers)
-        if response.status_code == 200:
-            return response.json()
-        return None
+    def _request(self, method: str, path: str, **kwargs) -> requests.Response:
+        try:
+            return requests.request(
+                method, f"{self.BASE_URL}{path}", headers=self.headers, timeout=TIMEOUT_SECONDS, **kwargs
+            )
+        except requests.RequestException as exc:
+            logger.error("Paystack %s %s unreachable: %s", method, path.split("?")[0], exc)
+            raise PaystackError("Payment provider unreachable") from exc
 
-    def create_transfer_recipient(self, name: str, account_number: str, bank_code: str):
-        """Create a transfer recipient on Paystack"""
-        url = f"{self.BASE_URL}/transferrecipient"
+    @staticmethod
+    def _message(response: requests.Response) -> str:
+        try:
+            return response.json().get("message", "Unknown error")
+        except ValueError:
+            return "Unknown error"
+
+    # ── Webhooks ─────────────────────────────────────────────────────────────
+    def verify_webhook_signature(self, raw_body: bytes, signature: Optional[str]) -> bool:
+        if not signature:
+            return False
+        expected = hmac.new(self.secret_key.encode(), raw_body, hashlib.sha512).hexdigest()
+        return hmac.compare_digest(expected, signature)
+
+    # ── Collections ──────────────────────────────────────────────────────────
+    def verify_transaction(self, reference: str) -> dict:
+        """Return the transaction `data` object. Raises PaystackError if Paystack can't confirm it."""
+        response = self._request("GET", f"/transaction/verify/{reference}")
+        if response.status_code != 200:
+            logger.warning("Paystack verify failed for %s: %s", reference, self._message(response))
+            raise PaystackError(self._message(response))
+        return response.json().get("data") or {}
+
+    def refund(self, reference: str, reason: str = "", amount=None) -> dict:
+        """Refund a transaction — in full, or `amount` naira for a partial refund."""
+        from app.services.pricing import to_kobo
+        payload = {"transaction": reference, "merchant_note": reason[:200]}
+        if amount is not None:
+            payload["amount"] = to_kobo(amount)
+        response = self._request("POST", "/refund", json=payload)
+        if response.status_code not in (200, 201):
+            logger.error("Paystack refund failed for %s: %s", reference, self._message(response))
+            raise PaystackError(self._message(response))
+        return response.json().get("data") or {}
+
+    def retry_refund_with_details(self, refund_id: str, account_number: str, bank_code: str) -> dict:
+        """Complete a "needs-attention" refund by giving Paystack the customer's bank account.
+        Paystack wants its own bank *id* here, not the bank code, so we look it up."""
+        bank_id = self.bank_id_for_code(bank_code)
+        if bank_id is None:
+            raise PaystackError(f"Unknown bank code {bank_code}")
+        response = self._request(
+            "POST",
+            f"/refund/retry_with_customer_details/{refund_id}",
+            json={"refund_account_details": {
+                "currency": "NGN", "account_number": account_number, "bank_id": str(bank_id),
+            }},
+        )
+        if response.status_code not in (200, 201):
+            logger.error("Paystack refund retry failed for %s: %s", refund_id, self._message(response))
+            raise PaystackError(self._message(response))
+        return response.json().get("data") or {}
+
+    _bank_ids: dict = {}
+
+    def bank_id_for_code(self, bank_code: str):
+        if not PaystackService._bank_ids:
+            banks = self.get_banks() or {}
+            PaystackService._bank_ids = {str(b.get("code")): b.get("id") for b in banks.get("data") or []}
+        return PaystackService._bank_ids.get(str(bank_code))
+
+    # ── Payouts ──────────────────────────────────────────────────────────────
+    def create_transfer_recipient(self, name: str, account_number: str, bank_code: str) -> str:
         data = {
             "type": "nuban",
             "name": name,
             "account_number": account_number,
             "bank_code": bank_code,
-            "currency": "NGN"
+            "currency": "NGN",
         }
-        
-        response = requests.post(url, headers=self.headers, json=data)
-        
-        if response.status_code in [200, 201]:
-            result = response.json()
-            if result["status"]:
-                return result["data"]["recipient_code"]
-        
-        # Log error or details
-        print(f"Paystack recipient creation failed: {response.text}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Could not verify bank account details: {response.json().get('message', 'Unknown error')}"
-        )
-
-    def initiate_transfer(self, amount: float, recipient_code: str, reference: str, reason: str = "Vendor Payout"):
-        """Initiate a transfer to the vendor"""
-        url = f"{self.BASE_URL}/transfer"
-        data = {
-            "source": "balance", 
-            "amount": int(amount * 100), # Convert to kobo
-            "recipient": recipient_code,
-            "reference": f"TRF_{reference}",
-            "reason": reason
-        }
-        
-        response = requests.post(url, headers=self.headers, json=data)
-        
-        if response.status_code in [200, 201]:
-            return response.json()
-            
-        print(f"Paystack transfer failed: {response.text}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Payout failed: {response.json().get('message', 'Unknown error')}"
-        )
-        
-    def resolve_account_number(self, account_number: str, bank_code: str):
-        """Verify account number"""
-        url = f"{self.BASE_URL}/bank/resolve?account_number={account_number}&bank_code={bank_code}"
-        response = requests.get(url, headers=self.headers)
-        print(f"[Paystack resolve] status={response.status_code} body={response.text}")
-        if response.status_code == 200:
-            return response.json()
         try:
-            return {"status": False, "paystack_message": response.json().get("message", "")}
-        except Exception:
-            return {"status": False, "paystack_message": response.text}
+            response = self._request("POST", "/transferrecipient", json=data)
+        except PaystackError:
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Payment provider unreachable")
 
-    def get_banks(self):
-        """Get list of banks"""
-        url = f"{self.BASE_URL}/bank?currency=NGN"
-        response = requests.get(url, headers=self.headers)
+        if response.status_code in (200, 201):
+            result = response.json()
+            if result.get("status"):
+                return result["data"]["recipient_code"]
+
+        logger.warning(
+            "Paystack recipient creation failed (account %s): %s", _mask(account_number), self._message(response)
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Could not verify bank account details: {self._message(response)}",
+        )
+
+    def initiate_transfer(self, amount: Decimal, recipient_code: str, reference: str, reason: str) -> dict:
+        """Transfer `amount` naira. Paystack treats `reference` as idempotent, so retries are safe."""
+        from app.services.pricing import to_kobo
+
+        data = {
+            "source": "balance",
+            "amount": to_kobo(amount),
+            "recipient": recipient_code,
+            "reference": reference,
+            "reason": reason,
+        }
+        response = self._request("POST", "/transfer", json=data)
+        if response.status_code in (200, 201):
+            return response.json().get("data") or {}
+        logger.error("Paystack transfer %s failed: %s", reference, self._message(response))
+        raise PaystackError(self._message(response))
+
+    def verify_transfer(self, reference: str) -> dict:
+        """Current state of a transfer, straight from Paystack (fallback when no webhook arrives)."""
+        response = self._request("GET", f"/transfer/verify/{reference}")
+        if response.status_code != 200:
+            raise PaystackError(self._message(response))
+        return response.json().get("data") or {}
+
+    def resolve_account_number(self, account_number: str, bank_code: str) -> dict:
+        try:
+            response = self._request(
+                "GET", "/bank/resolve", params={"account_number": account_number, "bank_code": bank_code}
+            )
+        except PaystackError:
+            return {"status": False, "paystack_message": "Payment provider unreachable"}
+        logger.info("Paystack resolve account %s: HTTP %s", _mask(account_number), response.status_code)
         if response.status_code == 200:
             return response.json()
-        return None
+        return {"status": False, "paystack_message": self._message(response)}
+
+    def get_banks(self) -> Optional[dict]:
+        try:
+            response = self._request("GET", "/bank", params={"currency": "NGN"})
+        except PaystackError:
+            return None
+        return response.json() if response.status_code == 200 else None
+
 
 paystack_service = PaystackService()

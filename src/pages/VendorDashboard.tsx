@@ -21,6 +21,7 @@ import {
   Package,
   ShieldCheck,
   AlertTriangle,
+  MapPin,
   RefreshCw,
   Info,
   ArrowUp,
@@ -30,6 +31,15 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
+import DashboardHeader from "@/components/common/DashboardHeader";
+import BookingTimeline from "@/components/common/BookingTimeline";
+import { ShowMoreButton, useShowMore } from "@/components/common/ShowMore";
+import AddonsPanel from "@/components/common/AddonsPanel";
+import VendorShareKit from "@/components/common/VendorShareKit";
+import { NoShowResponseDialog, VendorCancelDialog } from "@/components/common/CancellationDialogs";
+import { FileText, MessageCircle } from "lucide-react";
+import { useConfirm } from "@/components/common/ConfirmDialog";
+import { formatNaira } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
@@ -76,6 +86,7 @@ const VendorDashboard = () => {
     },
     enabled: !!user && user.role === "vendor",
   });
+  const bookingList = useShowMore(bookings as any[], 4);
 
   // Update booking status mutation
   const updateBookingStatus = useMutation({
@@ -162,40 +173,42 @@ const VendorDashboard = () => {
     updateBookingStatus.mutate({ bookingId, status: "confirmed" });
   };
 
-  const handleDecline = (bookingId: number) => {
-    updateBookingStatus.mutate({ bookingId, status: "declined" });
+  const confirm = useConfirm();
+  const [vendorCancelBooking, setVendorCancelBooking] = useState<any | null>(null);
+  const [noShowBooking, setNoShowBooking] = useState<any | null>(null);
+  const runAction = async (fn: () => Promise<unknown>, success: string) => {
+    try {
+      await fn();
+      toast.success(success);
+      queryClient.invalidateQueries({ queryKey: ["vendor-bookings"] });
+    } catch (e: any) {
+      const d = e?.response?.data?.detail;
+      toast.error(typeof d === "string" ? d : "Something went wrong. Please try again.");
+    }
+  };
+
+  const handleDecline = async (bookingId: number) => {
+    const ok = await confirm({
+      title: "Decline this booking?",
+      description: "The customer will be refunded in full and notified. This can't be undone.",
+      confirmText: "Decline booking",
+      cancelText: "Go back",
+      tone: "danger",
+    });
+    if (ok) updateBookingStatus.mutate({ bookingId, status: "declined" });
   };
 
   return (
     <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/20 via-background to-background">
       {/* Header */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-white/20 shadow-sm">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-3">
-          <div className="flex items-center justify-between">
-            <Link to="/">
-              <img src="/Plagohive.svg" alt="Plagohive" className="h-12 w-auto object-contain" />
-            </Link>
-            <nav className="hidden md:flex items-center gap-6">
-              <Link to="/vendor-dashboard" className="text-sm font-medium text-primary bg-primary/10 px-3 py-1.5 rounded-full">Dashboard</Link>
-              <Link to="/profile" className="text-sm font-medium hover:text-primary transition-colors text-foreground/70">Profile</Link>
-              {user && (
-                <span className="text-sm text-muted-foreground flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-secondary to-accent text-white flex items-center justify-center font-bold shadow-sm">
-                    {user.business_name?.[0] || user.full_name?.[0] || "V"}
-                  </div>
-                  <span className="hidden sm:inline">{user.business_name || user.full_name}</span>
-                </span>
-              )}
-              <Button variant="ghost" size="sm" onClick={handleLogout} className="text-destructive hover:text-destructive hover:bg-destructive/10">
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
-              </Button>
-            </nav>
-          </div>
-        </div>
-      </header>
+      <DashboardHeader
+        links={[{ to: "/vendor-dashboard", label: "Dashboard" }, { to: "/messages", label: "Messages" }, { to: "/profile", label: "Profile" }]}
+        displayName={vendorProfile?.business_name || user?.full_name || "Vendor"}
+        subtitle={user?.email}
+        onLogout={handleLogout}
+      />
 
-      <section className="pt-32 pb-16">
+      <section className="pt-24 sm:pt-32 pb-16">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
           {/* Welcome Section */}
           <div className="mb-12 animate-fade-in-up">
@@ -217,8 +230,26 @@ const VendorDashboard = () => {
             </div>
           </div>
 
+          {/* Admin decision banner — rejected or paused, with the reason */}
+          {vendorProfile && (vendorProfile.verification_status === "rejected" || vendorProfile.is_active === false) && (
+            <div className="mb-8 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  {vendorProfile.is_active === false ? "Your listing is paused" : "We couldn't verify your business yet"}
+                </p>
+                {vendorProfile.verification_note && (
+                  <p className="text-xs text-muted-foreground mt-0.5">Reason: {vendorProfile.verification_note}</p>
+                )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  Customers can't find or book you right now. Update your <Link to="/profile" className="underline">profile</Link> and reply to our email when you're ready for another look.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* CAC Verification Banner — three distinct states */}
-          {vendorProfile && vendorProfile.verification_status !== "approved" && (() => {
+          {vendorProfile && vendorProfile.verification_status === "pending" && vendorProfile.is_active !== false && (() => {
             const attempted = vendorProfile.cac_verification_attempted;
             const hasNameMatch = !!vendorProfile.cac_verified_name;
 
@@ -335,14 +366,14 @@ const VendorDashboard = () => {
                 {/* Step rows */}
                 <div className="bg-white divide-y divide-border">
                   {steps.map((step) => (
-                    <div key={step.id} className={`flex items-center gap-4 px-5 py-4 transition-colors ${step.done ? "bg-muted/20" : "hover:bg-primary/5"}`}>
+                    <div key={step.id} className={`flex flex-wrap sm:flex-nowrap items-center gap-x-4 gap-y-3 px-4 sm:px-5 py-4 transition-colors ${step.done ? "bg-muted/20" : "hover:bg-primary/5"}`}>
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${step.done ? "bg-green-500/10" : "bg-primary/10"}`}>
                         {step.done
                           ? <CheckCircle2 className="h-4 w-4 text-green-600" />
                           : <div className="w-2.5 h-2.5 rounded-full bg-primary" />
                         }
                       </div>
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0 basis-[calc(100%-3rem)] sm:basis-auto">
                         <p className={`text-sm font-semibold ${step.done ? "text-muted-foreground line-through decoration-muted-foreground/40" : "text-foreground"}`}>
                           {step.label}
                         </p>
@@ -351,7 +382,7 @@ const VendorDashboard = () => {
                         )}
                       </div>
                       {!step.done && step.action && (
-                        <Button size="sm" className="flex-shrink-0 h-8 text-xs gap-1.5" onClick={step.action}>
+                        <Button size="sm" className="flex-shrink-0 h-9 sm:h-8 text-xs gap-1.5 ml-12 sm:ml-0" onClick={step.action}>
                           {step.cta}
                           <ArrowRight className="h-3 w-3" />
                         </Button>
@@ -364,75 +395,75 @@ const VendorDashboard = () => {
           })()}
 
           {/* Quick Stats */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12 animate-fade-in-up [animation-delay:200ms]">
-            <Card className="bg-white border border-border p-6 hover:shadow-[var(--shadow-elevated)] transition-all">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-8 sm:mb-12 animate-fade-in-up [animation-delay:200ms]">
+            <Card className="bg-white border border-border p-4 sm:p-6 hover:shadow-[var(--shadow-elevated)] transition-all">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Total Earnings</p>
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground mb-1">Total Earnings</p>
                   {statsLoading ? (
                     <div className="h-9 w-24 bg-gray-200 animate-pulse rounded" />
                   ) : (
-                    <p className="text-3xl font-bold text-primary">
-                      ₦{(stats?.total_earnings || 0).toLocaleString()}
+                    <p className="text-2xl sm:text-3xl font-bold text-primary">
+                      {formatNaira(stats?.total_earnings || 0)}
                     </p>
                   )}
                 </div>
-                <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center shadow-sm">
+                <div className="hidden sm:flex w-12 h-12 bg-primary/10 rounded-2xl items-center justify-center shadow-sm">
                   <Banknote className="h-6 w-6 text-primary" />
                 </div>
               </div>
             </Card>
 
-            <Card className="bg-white border border-border p-6 hover:shadow-[var(--shadow-elevated)] transition-all">
+            <Card className="bg-white border border-border p-4 sm:p-6 hover:shadow-[var(--shadow-elevated)] transition-all">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Total Bookings</p>
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground mb-1">Total Bookings</p>
                   {statsLoading ? (
                     <div className="h-9 w-16 bg-gray-200 animate-pulse rounded" />
                   ) : (
-                    <p className="text-3xl font-bold text-accent">
+                    <p className="text-2xl sm:text-3xl font-bold text-accent">
                       {stats?.total_bookings || 0}
                     </p>
                   )}
                 </div>
-                <div className="w-12 h-12 bg-accent/10 rounded-2xl flex items-center justify-center shadow-sm">
+                <div className="hidden sm:flex w-12 h-12 bg-accent/10 rounded-2xl items-center justify-center shadow-sm">
                   <Package className="h-6 w-6 text-accent" />
                 </div>
               </div>
             </Card>
 
-            <Card className="bg-white border border-border p-6 hover:shadow-[var(--shadow-elevated)] transition-all">
+            <Card className="bg-white border border-border p-4 sm:p-6 hover:shadow-[var(--shadow-elevated)] transition-all">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Rating</p>
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground mb-1">Rating</p>
                   {statsLoading ? (
                     <div className="h-9 w-16 bg-gray-200 animate-pulse rounded" />
                   ) : (
-                    <p className="text-3xl font-bold text-yellow-500">
+                    <p className="text-2xl sm:text-3xl font-bold text-yellow-500">
                       {(stats?.average_rating ?? 0) > 0 ? Number(stats!.average_rating).toFixed(1) : "N/A"}
                     </p>
                   )}
                 </div>
-                <div className="w-12 h-12 bg-yellow-400/10 rounded-2xl flex items-center justify-center shadow-sm">
+                <div className="hidden sm:flex w-12 h-12 bg-yellow-400/10 rounded-2xl items-center justify-center shadow-sm">
                   <Star className="h-6 w-6 fill-yellow-400 text-yellow-400" />
                 </div>
               </div>
             </Card>
 
-            <Card className="bg-white border border-border p-6 hover:shadow-[var(--shadow-elevated)] transition-all">
+            <Card className="bg-white border border-border p-4 sm:p-6 hover:shadow-[var(--shadow-elevated)] transition-all">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-1">Customers</p>
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground mb-1">Customers</p>
                   {statsLoading ? (
                     <div className="h-9 w-16 bg-gray-200 animate-pulse rounded" />
                   ) : (
-                    <p className="text-3xl font-bold text-blue-500">
+                    <p className="text-2xl sm:text-3xl font-bold text-celebrate">
                       {stats?.total_clients || 0}
                     </p>
                   )}
                 </div>
-                <div className="w-12 h-12 bg-blue-500/10 rounded-2xl flex items-center justify-center shadow-sm">
-                  <TrendingUp className="h-6 w-6 text-blue-500" />
+                <div className="hidden sm:flex w-12 h-12 bg-celebrate/10 rounded-2xl items-center justify-center shadow-sm">
+                  <TrendingUp className="h-6 w-6 text-celebrate" />
                 </div>
               </div>
             </Card>
@@ -465,9 +496,9 @@ const VendorDashboard = () => {
                   <p className="text-muted-foreground mb-6 max-w-sm mx-auto">When customers book your services, they will appear here.</p>
                 </Card>
               ) : (
-                <div className="space-y-4">
-                  {bookings.map((booking: any) => (
-                    <Card key={booking.id} className="bg-white border border-border p-6 hover:shadow-lg transition-shadow">
+                <><div className="space-y-4">
+                  {bookingList.visible.map((booking: any) => (
+                    <Card key={booking.id} className="bg-white border border-border p-4 sm:p-6 rounded-2xl hover:shadow-lg transition-shadow">
                       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                         <div className="space-y-3">
                           <div className="flex items-center gap-3 flex-wrap">
@@ -476,7 +507,8 @@ const VendorDashboard = () => {
                               className={`${booking.status === "confirmed" ? "bg-green-500/10 text-green-700 hover:bg-green-500/20" :
                                 booking.status === "pending" ? "bg-orange-500/10 text-orange-700 hover:bg-orange-500/20" :
                                 booking.status === "awaiting_confirmation" ? "bg-purple-500/10 text-purple-700 hover:bg-purple-500/20" :
-                                booking.status === "completed" ? "bg-blue-500/10 text-blue-700 hover:bg-blue-500/20" :
+                                booking.status === "completed" ? "bg-celebrate/10 text-celebrate hover:bg-celebrate/20" :
+                                booking.status === "disputed" ? "bg-amber-500/10 text-amber-700 hover:bg-amber-500/20" :
                                   "bg-destructive/10 text-destructive hover:bg-destructive/20"
                                 }`}
                             >
@@ -488,6 +520,7 @@ const VendorDashboard = () => {
                                 pending: "Pending",
                                 confirmed: "Confirmed",
                                 awaiting_confirmation: "Waiting for Customer",
+                                disputed: "Under Review",
                                 completed: "Completed",
                                 declined: "Declined",
                                 cancelled: "Cancelled",
@@ -508,13 +541,14 @@ const VendorDashboard = () => {
                           </div>
                         </div>
 
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                          <div className="text-right">
-                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Amount</p>
-                            <p className="text-xl font-bold text-primary">₦{Number(booking.price).toLocaleString()}</p>
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
+                          <div className="sm:text-right">
+                            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Your payout</p>
+                            <p className="text-xl font-bold text-primary">{formatNaira(booking.payout_amount ?? booking.price)}</p>
+                            <p className="text-xs text-muted-foreground">of {formatNaira(booking.price)} booking</p>
                           </div>
 
-                          <div className="flex gap-2">
+                          <div className="flex flex-wrap gap-2">
                             {booking.status === "pending" && (
                               <>
                                 <Button
@@ -538,36 +572,66 @@ const VendorDashboard = () => {
                               </>
                             )}
                             {booking.status === "confirmed" && (() => {
-                              const eventPassed = new Date(booking.event_date) <= new Date();
+                              const start = new Date(booking.event_date).getTime();
+                              const now = Date.now();
+                              const eventPassed = start <= now;
+                              const withinWeek = start - now <= 7 * 86400_000;
+                              const checkInOpen = start - now <= 6 * 3600_000;
                               return (
-                                <div className="flex flex-col items-end gap-1">
-                                  <Button
-                                    size="sm"
-                                    onClick={() => updateBookingStatus.mutate({ bookingId: booking.id, status: "awaiting_confirmation" })}
-                                    disabled={updateBookingStatus.isPending || !eventPassed}
-                                    className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
-                                  >
-                                    <CheckCircle2 className="h-4 w-4 mr-1" />
-                                    Mark Complete
-                                  </Button>
+                                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                                  {withinWeek && !booking.reconfirmed_at && !eventPassed && (
+                                    <Button size="sm" onClick={() => runAction(() => api.bookings.reconfirm(booking.id), "Reconfirmed — the customer has been told you're all set.")}
+                                      className="bg-celebrate-emerald hover:bg-celebrate-emerald/90 text-white">
+                                      <CheckCircle2 className="h-4 w-4 mr-1" /> Reconfirm
+                                    </Button>
+                                  )}
+                                  {checkInOpen && !booking.checked_in_at && (
+                                    <Button size="sm" onClick={() => runAction(() => api.bookings.checkIn(booking.id), "Checked in. Have a great event!")}
+                                      className="bg-celebrate-emerald hover:bg-celebrate-emerald/90 text-white">
+                                      <MapPin className="h-4 w-4 mr-1" /> I've arrived
+                                    </Button>
+                                  )}
+                                  {booking.checked_in_at && (
+                                    <span className="text-xs font-medium text-celebrate-emerald flex items-center gap-1">
+                                      <CheckCircle2 className="h-3.5 w-3.5" /> Checked in
+                                    </span>
+                                  )}
+                                  {eventPassed && (
+                                    <Button size="sm" onClick={() => updateBookingStatus.mutate({ bookingId: booking.id, status: "awaiting_confirmation" })}
+                                      disabled={updateBookingStatus.isPending} className="bg-celebrate hover:bg-celebrate/90 text-white">
+                                      <CheckCircle2 className="h-4 w-4 mr-1" /> Mark complete
+                                    </Button>
+                                  )}
                                   {!eventPassed && (
-                                    <p className="text-[11px] text-muted-foreground">
-                                      Available from {formatDate(booking.event_date)}
-                                    </p>
+                                    <button type="button" onClick={() => setVendorCancelBooking(booking)}
+                                      className="text-xs text-muted-foreground hover:text-destructive underline-offset-4 hover:underline px-1">
+                                      Can't make it?
+                                    </button>
                                   )}
                                 </div>
                               );
                             })()}
-                            {booking.status === "awaiting_confirmation" && (
-                              <div className="flex flex-col items-end gap-1">
-                                <Badge className="bg-purple-500/10 text-purple-700 border-purple-500/20 text-xs px-2 py-1">
-                                  <Clock className="h-3 w-3 mr-1" />
-                                  Waiting for Customer
-                                </Badge>
-                                <p className="text-[11px] text-muted-foreground">
-                                  Customer must confirm service before payment is released
-                                </p>
+                            {booking.status === "disputed" && booking.dispute_kind === "no_show" && !booking.vendor_responded_at && (
+                              <Button size="sm" variant="destructive" onClick={() => setNoShowBooking(booking)}>
+                                <AlertTriangle className="h-4 w-4 mr-1" /> Respond to no-show report
+                              </Button>
+                            )}
+                            {booking.counterpart_phone && (
+                              <a href={`tel:${booking.counterpart_phone}`} className="text-xs font-medium text-primary hover:underline">
+                                Call customer · {booking.counterpart_phone}
+                              </a>
+                            )}
+                            {booking.status === "disputed" && (
+                              <div className="sm:max-w-xs rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs">
+                                <p className="font-semibold text-amber-800 mb-0.5">What the customer told us</p>
+                                {booking.dispute_reason && <p className="text-foreground/80 line-clamp-3">"{booking.dispute_reason}"</p>}
+                                <p className="text-muted-foreground mt-1">Reply to our email with any evidence. We'll decide within 2 working days.</p>
                               </div>
+                            )}
+                            {booking.resolution_note && booking.status !== "disputed" && (
+                              <p className="max-w-xs text-xs text-muted-foreground">
+                                <span className="font-semibold">{booking.resolution === "refund" ? "Refunded to customer" : "Payout released"}:</span> {booking.resolution_note}
+                              </p>
                             )}
                             <Button
                               size="sm"
@@ -578,12 +642,35 @@ const VendorDashboard = () => {
                               <Info className="h-3.5 w-3.5 mr-1" />
                               Details
                             </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-muted-foreground hover:text-primary"
+                              onClick={() => api.messages.forBooking(booking.id).then((c) => navigate(`/messages/${c.id}`)).catch(() => toast.error("Couldn't open the chat."))}
+                            >
+                              <MessageCircle className="h-3.5 w-3.5 mr-1" />
+                              Message
+                            </Button>
+                            {["processing", "awaiting_otp", "paid"].includes(booking.payout_status) && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-muted-foreground hover:text-primary"
+                                onClick={() => api.documents.download(booking.id, "payout-statement").catch(() => toast.error("Couldn't download the statement. Please try again."))}
+                              >
+                                <FileText className="h-3.5 w-3.5 mr-1" />
+                                Statement
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </div>
+                      <BookingTimeline booking={booking} role="vendor" className="mt-4 pt-4 border-t border-border/70" />
+                      <AddonsPanel booking={booking} role="vendor" />
                     </Card>
                   ))}
                 </div>
+                <ShowMoreButton {...bookingList} noun="more bookings" className="mt-4" /></>
               )}
             </TabsContent>
 
@@ -643,57 +730,11 @@ const VendorDashboard = () => {
             </TabsContent>
 
             <TabsContent value="settings" className="space-y-6">
-              {/* Pricing Settings */}
+              {/* Prices, logistics and availability live on the profile page */}
               <Card className="bg-white border border-border p-6">
-                <h2 className="text-2xl font-bold mb-2 text-foreground">Pricing Settings</h2>
-                <p className="text-muted-foreground mb-6">Update your service fee and logistics charge. These are shown to customers during booking.</p>
-                <form
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    const fd = new FormData(e.currentTarget);
-                    const service_fee_percentage = fd.get("service_fee_percentage") ? Number(fd.get("service_fee_percentage")) : undefined;
-                    const logistics_fee = fd.get("logistics_fee") ? Number(fd.get("logistics_fee")) : undefined;
-                    try {
-                      await api.vendors.updateMyVendor({ service_fee_percentage, logistics_fee });
-                      toast.success("Pricing settings saved!");
-                      queryClient.invalidateQueries({ queryKey: ["vendor-profile"] });
-                    } catch (error: any) {
-                      toast.error(error.response?.data?.detail || "Failed to save pricing settings");
-                    }
-                  }}
-                  className="space-y-4 max-w-md"
-                >
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Service Fee (%)</label>
-                    <p className="text-xs text-muted-foreground">Added as a percentage of the order subtotal. Leave blank if you don't charge a service fee.</p>
-                    <input
-                      type="number"
-                      name="service_fee_percentage"
-                      min={0}
-                      max={100}
-                      step={0.01}
-                      placeholder="e.g. 10"
-                      defaultValue={vendorProfile?.service_fee_percentage != null ? Number(vendorProfile.service_fee_percentage) : ""}
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    />
-                  </div>
-                  {vendorProfile?.category === "logistics" && (
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Logistics / Delivery Fee (₦)</label>
-                      <p className="text-xs text-muted-foreground">Fixed delivery charge added to every booking.</p>
-                      <input
-                        type="number"
-                        name="logistics_fee"
-                        min={0}
-                        step={100}
-                        placeholder="e.g. 15000"
-                        defaultValue={vendorProfile?.logistics_fee != null ? Number(vendorProfile.logistics_fee) : ""}
-                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                      />
-                    </div>
-                  )}
-                  <Button type="submit">Save Pricing</Button>
-                </form>
+                <h2 className="text-2xl font-bold mb-2 text-foreground">Prices, logistics and availability</h2>
+                <p className="text-muted-foreground mb-4">Set your services and prices, your logistics fee (in your state and for other states), the days you're available and your preparation advance on your profile.</p>
+                <Button onClick={() => navigate("/profile")}>Open my profile</Button>
               </Card>
 
               <Card className="bg-white border border-border p-6">
@@ -780,8 +821,13 @@ const VendorDashboard = () => {
             </TabsContent>
           </Tabs>
 
+          {/* Share kit: verified card and stats card for socials */}
+          <section className="mt-12">
+            <VendorShareKit vendor={vendorProfile} stats={stats} />
+          </section>
+
           {/* Performance Analytics */}
-          <section className="mt-16 pb-8">
+          <section className="mt-12 pb-8">
             <Card className="bg-white border border-border p-6 md:p-8">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-8">
                 <div>
@@ -864,7 +910,7 @@ const VendorDashboard = () => {
                           { key: "pending",   color: "bg-orange-400", label: "Pending",    count: counts.pending },
                           { key: "confirmed", color: "bg-green-500",  label: "Confirmed",  count: counts.confirmed },
                           { key: "awaiting",  color: "bg-purple-500", label: "Awaiting",   count: counts.awaiting },
-                          { key: "completed", color: "bg-blue-500",   label: "Completed",  count: counts.completed },
+                          { key: "completed", color: "bg-celebrate",   label: "Completed",  count: counts.completed },
                           { key: "declined",  color: "bg-red-400",    label: "Declined",   count: counts.declined },
                           { key: "cancelled", color: "bg-gray-300",   label: "Cancelled",  count: counts.cancelled },
                         ].filter(s => s.count > 0);
@@ -965,7 +1011,11 @@ const VendorDashboard = () => {
                 </div>
               )}
             </Card>
-          </section>
+          <VendorCancelDialog booking={vendorCancelBooking} onClose={() => setVendorCancelBooking(null)}
+        onDone={() => queryClient.invalidateQueries({ queryKey: ["vendor-bookings"] })} />
+      <NoShowResponseDialog booking={noShowBooking} onClose={() => setNoShowBooking(null)}
+        onDone={() => queryClient.invalidateQueries({ queryKey: ["vendor-bookings"] })} />
+      </section>
         </div>
       </section>
 
@@ -984,7 +1034,7 @@ const VendorDashboard = () => {
                 </div>
                 <Badge className={
                   detailBooking.status === "confirmed" ? "bg-green-500/10 text-green-700" :
-                  detailBooking.status === "completed" ? "bg-blue-500/10 text-blue-700" :
+                  detailBooking.status === "completed" ? "bg-celebrate/10 text-celebrate" :
                   detailBooking.status === "pending" ? "bg-orange-500/10 text-orange-700" :
                   "bg-gray-100 text-gray-700"
                 }>
@@ -1011,8 +1061,31 @@ const VendorDashboard = () => {
                   <CheckCircle2 className="h-3.5 w-3.5" /> Paid
                 </div>
 
-                <div className="text-muted-foreground">Amount</div>
-                <div className="font-bold text-primary">₦{Number(detailBooking.price).toLocaleString()}</div>
+                <div className="text-muted-foreground">Booking amount</div>
+                <div className="font-medium">{formatNaira(detailBooking.price)}</div>
+
+                {detailBooking.commission_amount != null && (
+                  <>
+                    <div className="text-muted-foreground">Plagohive commission</div>
+                    <div className="font-medium text-muted-foreground">−{formatNaira(detailBooking.commission_amount)}</div>
+                  </>
+                )}
+
+                <div className="text-muted-foreground">Your payout</div>
+                <div className="font-bold text-primary">
+                  {formatNaira(detailBooking.payout_amount ?? detailBooking.price)}
+                  {detailBooking.payout_status && detailBooking.payout_status !== "not_due" && (
+                    <span className="ml-2 text-xs font-medium text-muted-foreground">
+                      {{
+                        awaiting_approval: "· being reviewed, usually within 1 working day",
+                        awaiting_otp: "· transfer in progress",
+                        processing: "· transfer in progress",
+                        paid: "· paid out",
+                        failed: "· delayed — our team is on it",
+                      }[detailBooking.payout_status as string]}
+                    </span>
+                  )}
+                </div>
               </div>
 
               {detailBooking.service_items_snapshot && detailBooking.service_items_snapshot.length > 0 && (
@@ -1026,7 +1099,7 @@ const VendorDashboard = () => {
                         <span>
                           {s.name} <span className="text-muted-foreground">× {s.quantity}</span>
                         </span>
-                        <span className="font-medium">₦{Number(s.subtotal).toLocaleString()}</span>
+                        <span className="font-medium">{formatNaira(s.subtotal)}</span>
                       </div>
                     ))}
                   </div>

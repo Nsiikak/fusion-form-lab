@@ -1,4 +1,11 @@
 import { useState, useEffect, type ElementType } from "react";
+import ImageCarousel from "@/components/common/ImageCarousel";
+import FavoriteButton, { ResponseBadge } from "@/components/common/FavoriteButton";
+import { thumb } from "@/lib/images";
+import { track } from "@/lib/analytics";
+import { useSeo } from "@/lib/seo";
+import { categoryLabel } from "@/lib/categories";
+import { CATEGORIES } from "@/lib/categories";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +15,7 @@ import { Slider } from "@/components/ui/slider";
 import { Search, MapPin, Star, Filter, LogOut, Utensils, Palette, Camera, Music, Truck, Building2, Store, CheckCircle2, SearchX } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Footer } from "@/components/Footer";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
@@ -21,12 +28,7 @@ const categories = [
 // Map frontend category names to backend enum values
 const categoryMap: Record<string, string | null> = {
   "All Categories": null,
-  "Catering": "catering",
-  "Decoration": "decoration",
-  "Photography": "photography",
-  "Entertainment": "entertainment",
-  "Logistics": "logistics",
-  "Venue": "venue",
+  ...Object.fromEntries(CATEGORIES.map((c) => [c.label, c.value])),
 };
 
 const VendorSearch = () => {
@@ -34,6 +36,16 @@ const VendorSearch = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const eventId = searchParams.get("event_id");
+  const { category: routeCategory, city: routeCity } = useParams();
+  const [availableOn, setAvailableOn] = useState(searchParams.get("date") || "");
+  // Links from the home search, occasion guides and event checklists pass ?category= and ?search=
+  useEffect(() => {
+    const cat = searchParams.get("category") || routeCategory;
+    const q = searchParams.get("search");
+    if (cat) setSelectedCategory(getCategoryDisplayName(cat));
+    if (q) { setSearchQuery(q); setSearchInput(q); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
   const [selectedCategory, setSelectedCategory] = useState("All Categories");
   const [budget, setBudget] = useState([300000]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -44,9 +56,19 @@ const VendorSearch = () => {
     navigate("/");
   };
 
+  const cityName = routeCity ? routeCity.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) : "";
+  const catName = routeCategory ? categoryLabel(routeCategory) : "";
+  useSeo(routeCategory || routeCity ? {
+    title: `${catName || "Event vendors"}${cityName ? ` in ${cityName}` : ""}`,
+    description: `Book verified ${(catName || "event vendors").toLowerCase()}${cityName ? ` in ${cityName}` : ""} on Plagohive. Real prices in naira, and your payment is held until your event is done.`,
+  } : {
+    title: "Find event vendors",
+    description: "Browse verified caterers, decorators, DJs, photographers and more. Your payment is held until your event is done.",
+  });
+
   // Fetch vendors from API
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["vendors", selectedCategory, budget, searchQuery, page],
+    queryKey: ["vendors", selectedCategory, budget, searchQuery, page, availableOn],
     queryFn: async () => {
       const params: any = {
         page,
@@ -65,6 +87,9 @@ const VendorSearch = () => {
       if (searchQuery.trim()) {
         params.search = searchQuery.trim();
       }
+      if (availableOn) params.available_on = availableOn;
+      if (routeCity) params.location = routeCity.replace(/-/g, " ");
+      if (searchQuery.trim() || categoryValue) track("search", { category: categoryValue || "all", has_query: !!searchQuery.trim(), date: !!availableOn });
 
       const response = await api.vendors.list(params);
       return response;
@@ -98,14 +123,7 @@ const VendorSearch = () => {
     return entry ? entry[0] : category;
   };
 
-  const categoryIconMap: Record<string, React.ElementType> = {
-    catering: Utensils,
-    decoration: Palette,
-    photography: Camera,
-    entertainment: Music,
-    logistics: Truck,
-    venue: Building2,
-  };
+  const categoryIconMap: Record<string, React.ElementType> = Object.fromEntries(CATEGORIES.map((c) => [c.value, c.icon]));
 
   const getCategoryIcon = (category: string): React.ElementType => {
     return categoryIconMap[category] || Store;
@@ -118,7 +136,7 @@ const VendorSearch = () => {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <Link to="/">
-              <img src="/Plagohive.svg" alt="Plagohive" className="h-12 w-auto object-contain" />
+              <img src="/Plagohive.svg" alt="Plagohive" className="w-auto object-contain h-7 sm:h-8" />
             </Link>
             <nav className="hidden md:flex items-center gap-6">
               <Link to="/vendor-search" className="text-sm font-medium hover:text-primary transition-colors">Find Vendors</Link>
@@ -174,6 +192,10 @@ const VendorSearch = () => {
 
             <div className="space-y-4">
               <div>
+                <label className="text-sm font-medium mb-2 block" htmlFor="avail-date">Event date (optional): only show vendors who are free</label>
+                <input id="avail-date" type="date" value={availableOn} min={new Date().toISOString().slice(0, 10)}
+                  onChange={(e) => { setAvailableOn(e.target.value); setPage(1); }}
+                  className="h-10 w-full sm:w-auto rounded-md border border-input bg-white px-3 text-sm mb-4" />
                 <label className="text-sm font-medium mb-2 block">Show vendors starting under ₦{budget[0].toLocaleString()}</label>
                 <Slider
                   value={budget}
@@ -266,12 +288,12 @@ const VendorSearch = () => {
                     className="overflow-hidden hover:shadow-elevated transition-all duration-300 hover:-translate-y-1 cursor-pointer"
                   >
                     <div className="aspect-video bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center overflow-hidden">
-                      {vendor.gallery_images?.[0] ? (
-                        <img
-                          src={vendor.gallery_images[0]}
-                          alt={vendor.business_name}
-                          className="w-full h-full object-cover"
-                        />
+                      {vendor.gallery_images?.length ? (
+                        <ImageCarousel images={vendor.gallery_images.slice(0, 6).map((u: string) => thumb(u))} alt={vendor.business_name} className="w-full h-full">
+                          <FavoriteButton vendorId={vendor.id} className="absolute top-2.5 right-2.5" />
+                        </ImageCarousel>
+                      ) : vendor.profile_image_url ? (
+                        <img src={vendor.profile_image_url} alt={vendor.business_name} className="w-full h-full object-cover" />
                       ) : (
                         (() => { const Icon = getCategoryIcon(vendor.category); return <Icon className="h-12 w-12 text-primary/40" />; })()
                       )}
@@ -283,7 +305,7 @@ const VendorSearch = () => {
                           <Badge variant="secondary">{getCategoryDisplayName(vendor.category)}</Badge>
                         </div>
                         {vendor.verification_status === "approved" && (
-                          <Badge className="bg-accent text-white gap-1"><CheckCircle2 className="h-3 w-3" /> Verified</Badge>
+                          <Badge className="bg-celebrate-emerald hover:bg-celebrate-emerald text-white gap-1"><CheckCircle2 className="h-3 w-3" /> Verified</Badge>
                         )}
                       </div>
 
@@ -293,9 +315,9 @@ const VendorSearch = () => {
                         </p>
                       )}
 
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-                        <MapPin className="h-4 w-4" />
-                        {vendor.location}
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground mb-4">
+                        <span className="flex items-center gap-2"><MapPin className="h-4 w-4" />{vendor.location}</span>
+                        <ResponseBadge hours={vendor.response_hours} />
                       </div>
 
                       <div className="flex items-center justify-between pt-4 border-t">

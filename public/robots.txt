@@ -1,14 +1,10 @@
-User-agent: Googlebot
-Allow: /
-
-User-agent: Bingbot
-Allow: /
-
-User-agent: Twitterbot
-Allow: /
-
-User-agent: facebookexternalhit
-Allow: /
-
 User-agent: *
 Allow: /
+Disallow: /admin
+Disallow: /customer-dashboard
+Disallow: /vendor-dashboard
+Disallow: /messages
+Disallow: /profile
+
+# Replace with your live domain
+Sitemap: https://plagohive.com/sitemap.xml

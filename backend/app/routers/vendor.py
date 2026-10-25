@@ -1,3 +1,5 @@
+from pydantic import BaseModel
+from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import Optional
@@ -9,7 +11,7 @@ from app.entities.vendor import schema
 from app.entities.vendor.schema import VendorResponse, VendorPublicResponse
 from app.entities.vendor.model import VendorCategory, Vendor, VerificationStatus
 from app.entities.vendor.service import VendorService
-from app.services.email import _fire_and_forget, send_vendor_welcome_email, send_vendor_approved_email, send_cac_verification_email
+from app.services.email import _fire_and_forget, send_vendor_welcome_email, send_cac_verification_email
 from app.services.upload import upload_image, delete_image
 
 router = APIRouter()
@@ -39,28 +41,6 @@ async def register_vendor(
             )
     return vendor
 
-
-@router.post("/{vendor_id}/approve", response_model=dict)
-async def approve_vendor(
-    vendor_id: int,
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """Admin: approve a vendor and notify them by email"""
-    if current_user.role.value != "admin":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin only")
-    vendor = db.query(Vendor).filter(Vendor.id == vendor_id).first()
-    if not vendor:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vendor not found")
-    vendor.verification_status = VerificationStatus.APPROVED
-    db.commit()
-    owner = db.query(User).filter(User.id == vendor.user_id).first()
-    if owner:
-        _fire_and_forget(
-            send_vendor_approved_email,
-            owner.email, owner.full_name or owner.email, vendor.business_name
-        )
-    return {"message": f"{vendor.business_name} approved successfully"}
 
 @router.get("/me", response_model=VendorResponse)
 async def get_my_vendor(
@@ -95,6 +75,14 @@ async def update_my_vendor(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only vendors can access this endpoint"
         )
+    if vendor_update.advance_mode and vendor_update.advance_mode != "none":
+        from app.services.pricing import advance_eligible
+        me = VendorService.get_vendor_by_user_id(db, current_user.id)
+        if me and not advance_eligible(db, me, vendor_update.advance_mode):
+            need = ("5 completed bookings and an account at least 60 days old" if vendor_update.advance_mode == "logistics_plus"
+                    else "3 completed bookings")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                                detail=f"This advance option unlocks after {need}, with no strikes in the last 90 days.")
     
     vendor = VendorService.get_vendor_by_user_id(db, current_user.id)
     if not vendor:
@@ -238,6 +226,7 @@ async def list_vendors(
     search: Optional[str] = Query(None, description="Search term"),
     page: int = Query(1, ge=1, description="Page number"),
     limit: int = Query(20, ge=1, le=100, description="Items per page"),
+    available_on: Optional[date] = Query(None, description="Only vendors free on this date"),
     db: Session = Depends(get_db)
 ):
     """List vendors with filters and pagination"""
@@ -250,7 +239,7 @@ async def list_vendors(
         search=search,
         page=page,
         limit=limit
-    )
+    , available_on=available_on)
     
     total_pages = ceil(total / limit) if total > 0 else 0
     
@@ -339,6 +328,76 @@ async def get_recommended_vendors(
         return score
 
     return sorted(vendors, key=relevance_score, reverse=True)[:limit]
+
+@router.get("/me/advance-eligibility")
+def my_advance_eligibility(current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    """What the vendor has unlocked, and progress towards the rest (shown in profile settings)."""
+    from datetime import datetime, timedelta, timezone
+    from app.entities.booking.model import Booking, BookingStatus
+    from app.entities.vendor.incident import VendorIncident
+    from app.services.pricing import advance_eligible
+    v = VendorService.get_vendor_by_user_id(db, current_user.id)
+    if not v:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vendor profile not found")
+    now = datetime.now(timezone.utc)
+    created = v.created_at if v.created_at and v.created_at.tzinfo else (v.created_at or now).replace(tzinfo=timezone.utc)
+    return {
+        "completed": db.query(Booking.id).filter(Booking.vendor_id == v.id, Booking.status == BookingStatus.COMPLETED).count(),
+        "account_days": (now - created).days,
+        "strikes_90d": db.query(VendorIncident.id).filter(VendorIncident.vendor_id == v.id, VendorIncident.severity.in_(["strike", "severe"]),
+                                                          VendorIncident.created_at >= now - timedelta(days=90)).count(),
+        "logistics": advance_eligible(db, v, "logistics"),
+        "logistics_plus": advance_eligible(db, v, "logistics_plus"),
+        "requirements": {"logistics": {"completed": 3}, "logistics_plus": {"completed": 5, "account_days": 60}},
+    }
+
+
+class AvailabilityUpdate(BaseModel):
+    blocked_dates: list[date] = []
+    daily_capacity: Optional[int] = None
+
+
+@router.get("/me/availability")
+def my_availability(current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    from datetime import date as _d
+    from app.entities.vendor.model import VendorBlockedDate
+    v = VendorService.get_vendor_by_user_id(db, current_user.id)
+    if not v:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vendor profile not found")
+    rows = db.query(VendorBlockedDate).filter(VendorBlockedDate.vendor_id == v.id, VendorBlockedDate.day >= _d.today()).all()
+    return {"blocked_dates": sorted(r.day.isoformat() for r in rows), "daily_capacity": v.daily_capacity}
+
+
+@router.put("/me/availability")
+def set_my_availability(body: AvailabilityUpdate, current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    """Replace the vendor's blocked future dates and set how many bookings they can take per day."""
+    from datetime import date as _d
+    from app.entities.vendor.model import VendorBlockedDate
+    v = VendorService.get_vendor_by_user_id(db, current_user.id)
+    if not v:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vendor profile not found")
+    if body.daily_capacity is not None and not (1 <= body.daily_capacity <= 50):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Daily capacity must be between 1 and 50")
+    db.query(VendorBlockedDate).filter(VendorBlockedDate.vendor_id == v.id, VendorBlockedDate.day >= _d.today()).delete()
+    for d in sorted(set(body.blocked_dates))[:366]:
+        if d >= _d.today():
+            db.add(VendorBlockedDate(vendor_id=v.id, day=d))
+    v.daily_capacity = body.daily_capacity
+    db.commit()
+    return my_availability(current_user, db)
+
+
+@router.get("/{vendor_id}/availability")
+def public_availability(vendor_id: int, start: date, end: date, db: Session = Depends(get_db)):
+    """Days a vendor can't be booked between two dates (blocked or fully booked)."""
+    from app.services.ranking import unavailable_days
+    v = db.query(Vendor).filter(Vendor.id == vendor_id).first()
+    if not v:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vendor not found")
+    if (end - start).days > 400:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Range too long")
+    return {"unavailable": sorted(d.isoformat() for d in unavailable_days(db, v, start, end))}
+
 
 @router.get("/{vendor_id}", response_model=VendorPublicResponse)
 async def get_vendor(

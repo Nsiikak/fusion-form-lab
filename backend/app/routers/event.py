@@ -112,9 +112,10 @@ async def get_event_bookings(
             "id": b.id,
             "vendor_id": b.vendor_id,
             "status": b.status.value,
-            "price": float(b.price),
+            "price": float(b.customer_total if b.customer_total is not None else b.price),
             "event_date": b.event_date.isoformat(),
         }
         for b in bookings
+        if b.paid_at is not None
     ]
 

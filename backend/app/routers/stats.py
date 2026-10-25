@@ -74,21 +74,22 @@ async def get_vendor_stats(
             detail="Vendor profile not found"
         )
 
-    base = db.query(Booking).filter(Booking.vendor_id == vendor.id)
+    base = db.query(Booking).filter(Booking.vendor_id == vendor.id, Booking.paid_at.isnot(None))
 
     active_bookings = base.filter(
         Booking.status.in_([BookingStatus.PENDING, BookingStatus.CONFIRMED])
     ).count()
 
     # Only count released payouts — COMPLETED means customer confirmed or 24h auto-release fired
-    total_earnings = db.query(func.coalesce(func.sum(Booking.price), 0)).filter(
+    # Earnings = net payouts actually sent to the vendor (after commission)
+    total_earnings = db.query(func.coalesce(func.sum(Booking.payout_amount), 0)).filter(
         Booking.vendor_id == vendor.id,
         Booking.status == BookingStatus.COMPLETED,
-        Booking.paid_out == True,  # noqa: E712
+        Booking.payout_status.in_(["processing", "paid"]),
     ).scalar() or 0
 
     unique_customers = db.query(func.count(distinct(Booking.customer_id))).filter(
-        Booking.vendor_id == vendor.id
+        Booking.vendor_id == vendor.id, Booking.paid_at.isnot(None)
     ).scalar() or 0
 
     total_bookings = base.count()
@@ -118,7 +119,11 @@ async def get_vendor_stats(
     else:
         growth_percentage = 0.0
 
+    from app.entities.booking.model import BookingStatus as _BS
+    completed_bookings = base.filter(Booking.status == _BS.COMPLETED).count()
+
     return {
+        "completed_bookings": completed_bookings,
         "total_earnings": float(total_earnings),
         "active_bookings": active_bookings,
         "average_rating": average_rating,

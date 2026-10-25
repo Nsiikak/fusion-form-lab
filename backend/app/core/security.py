@@ -46,15 +46,27 @@ def get_current_user(
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         email: str = payload.get("sub")
-        if email is None:
+        if email is None or payload.get("typ") == "refresh":
             raise credentials_exception
     except JWTError:
         raise credentials_exception
-    
+
     user = db.query(User).filter(User.email == email).first()
-    if user is None:
-        raise credentials_exception
+    if user is None or int(payload.get("tv", 0)) != int(user.token_version or 0):
+        raise credentials_exception   # signed out everywhere / password changed since this token was issued
     return user
+
+
+REFRESH_TOKEN_DAYS = 30
+
+
+def issue_tokens(user) -> dict:
+    """A short-lived access token plus a 30-day refresh token, both tied to the user's token version."""
+    tv = int(user.token_version or 0)
+    access = create_access_token({"sub": user.email, "tv": tv, "typ": "access"})
+    refresh = create_access_token({"sub": user.email, "tv": tv, "typ": "refresh"},
+                                  expires_delta=timedelta(days=REFRESH_TOKEN_DAYS))
+    return {"access_token": access, "refresh_token": refresh, "token_type": "bearer"}
 
 def get_current_active_user(
     current_user: User = Depends(get_current_user)

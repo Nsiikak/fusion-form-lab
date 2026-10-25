@@ -60,13 +60,28 @@ const ResetPassword = () => {
     );
   }
 
+  const [serverError, setServerError] = useState<string | null>(null);
   const onSubmit = async (data: FormValues) => {
+    setServerError(null);
     try {
       await api.auth.resetPassword(token, data.password);
       setDone(true);
       setTimeout(() => navigate("/login"), 3000);
     } catch (error: any) {
-      const msg = error.response?.data?.detail || "Reset failed. The link may have expired.";
+      // Say what actually went wrong, so it can be fixed
+      const api = import.meta.env.VITE_API_URL || "(VITE_API_URL not set)";
+      let msg: string;
+      if (!error.response) {
+        msg = `Couldn't reach the Plagohive server at ${api}. Check that the backend is running and that this website's address is in CORS_ORIGINS.`;
+      } else if (error.response.status === 400) {
+        const d = error.response.data?.detail;
+        msg = typeof d === "string" && /password/i.test(d) && !/link/i.test(d)
+          ? d
+          : "This reset link isn't valid any more: it was already used, it expired, or a newer link was requested. Request a new link and use the latest email.";
+      } else {
+        msg = `Reset failed (server error ${error.response.status}). Please try again or contact support.`;
+      }
+      setServerError(msg);
       toast.error(msg);
     }
   };
@@ -78,7 +93,7 @@ const ResetPassword = () => {
           <img
             src="/Plagohive.svg"
             alt="Plagohive"
-            className="h-10 w-auto object-contain"
+            className="w-auto object-contain h-7 sm:h-8"
             style={{ filter: "brightness(0) invert(1)" }}
           />
         </Link>
@@ -108,6 +123,9 @@ const ResetPassword = () => {
 
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  {serverError && (
+                    <p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive">{serverError}</p>
+                  )}
                   <FormField
                     control={form.control}
                     name="password"

@@ -1,3 +1,7 @@
+import { CATEGORIES } from "@/lib/categories";
+import { PolicyPicker } from "@/components/common/CancellationPolicy";
+import DeliveryAdvanceSettings from "@/components/common/DeliveryAdvanceSettings";
+import AvailabilitySettings from "@/components/common/AvailabilitySettings";
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -19,14 +23,7 @@ import {
   Plus, Pencil, Trash2, Package, ToggleLeft, ToggleRight, AlertTriangle
 } from "lucide-react";
 
-const categoryIconMap: Record<string, React.ElementType> = {
-  catering: Utensils,
-  decoration: Palette,
-  photography: Camera,
-  entertainment: Music,
-  logistics: Truck,
-  venue: Building2,
-};
+const categoryIconMap: Record<string, React.ElementType> = Object.fromEntries(CATEGORIES.map((c) => [c.value, c.icon]));
 
 const getCategoryIcon = (category: string): React.ElementType =>
   categoryIconMap[category] || Building2;
@@ -82,7 +79,7 @@ const VendorProfile = () => {
   // Service items state
   const [showAddItem, setShowAddItem] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
-  const [itemForm, setItemForm] = useState({ name: "", description: "", unit_price: "", unit_label: "each" });
+  const [itemForm, setItemForm] = useState({ name: "", description: "", unit_price: "", unit_label: "each", pricing_type: "unit", min_quantity: "1", max_quantity: "", included: "" });
 
   const { data: serviceItems = [], isLoading: serviceItemsLoading } = useQuery({
     queryKey: ["my-service-items"],
@@ -136,7 +133,7 @@ const VendorProfile = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["my-service-items"] });
       setShowAddItem(false);
-      setItemForm({ name: "", description: "", unit_price: "", unit_label: "each" });
+      setItemForm({ name: "", description: "", unit_price: "", unit_label: "each", pricing_type: "unit", min_quantity: "1", max_quantity: "", included: "" });
       toast.success("Service item added");
     },
     onError: (e: any) => toast.error(e.response?.data?.detail || "Failed to add item"),
@@ -163,16 +160,21 @@ const VendorProfile = () => {
 
   const handleItemSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const price = parseFloat(itemForm.unit_price);
-    if (!itemForm.name.trim() || isNaN(price) || price <= 0) {
-      toast.error("Please enter a valid name and price");
+    const quote = itemForm.pricing_type === "quote";
+    const price = quote ? 0 : parseFloat(itemForm.unit_price);
+    if (!itemForm.name.trim() || (!quote && (isNaN(price) || price <= 0))) {
+      toast.error(quote ? "Please enter a name" : "Please enter a valid name and price");
       return;
     }
-    const payload = {
+    const payload: any = {
       name: itemForm.name.trim(),
       description: itemForm.description.trim() || undefined,
       unit_price: price,
-      unit_label: itemForm.unit_label,
+      unit_label: itemForm.pricing_type === "package" ? "package" : itemForm.unit_label,
+      pricing_type: itemForm.pricing_type,
+      min_quantity: itemForm.pricing_type === "unit" ? Math.max(1, parseInt(itemForm.min_quantity || "1", 10) || 1) : 1,
+      max_quantity: itemForm.pricing_type === "unit" && itemForm.max_quantity ? parseInt(itemForm.max_quantity, 10) : null,
+      included: itemForm.included.split("\n").map((x) => x.trim()).filter(Boolean).slice(0, 20),
     };
     if (editingItem) {
       updateItemMutation.mutate({ id: editingItem.id, data: payload });
@@ -188,6 +190,10 @@ const VendorProfile = () => {
       description: item.description || "",
       unit_price: String(item.unit_price),
       unit_label: item.unit_label,
+      pricing_type: item.pricing_type || "unit",
+      min_quantity: String(item.min_quantity || 1),
+      max_quantity: item.max_quantity ? String(item.max_quantity) : "",
+      included: (item.included || []).join("\n"),
     });
     setShowAddItem(true);
   };
@@ -195,7 +201,7 @@ const VendorProfile = () => {
   const cancelItemForm = () => {
     setShowAddItem(false);
     setEditingItem(null);
-    setItemForm({ name: "", description: "", unit_price: "", unit_label: "each" });
+    setItemForm({ name: "", description: "", unit_price: "", unit_label: "each", pricing_type: "unit", min_quantity: "1", max_quantity: "", included: "" });
   };
 
   const handleLogout = () => {
@@ -332,7 +338,7 @@ const VendorProfile = () => {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-3">
           <div className="flex items-center justify-between">
             <Link to="/">
-              <img src="/Plagohive.svg" alt="Plagohive" className="h-12 w-auto object-contain" />
+              <img src="/Plagohive.svg" alt="Plagohive" className="w-auto object-contain h-7 sm:h-8" />
             </Link>
             <nav className="hidden md:flex items-center gap-4">
               <Link to="/vendor-dashboard">
@@ -343,10 +349,10 @@ const VendorProfile = () => {
               {user && (
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted">
                   <div className="w-7 h-7 rounded-full bg-gradient-to-br from-secondary to-accent text-white flex items-center justify-center font-bold text-xs">
-                    {user.business_name?.[0] || user.full_name?.[0] || "V"}
+                    {vendor?.business_name?.[0] || user.full_name?.[0] || "V"}
                   </div>
                   <span className="text-sm font-medium text-foreground hidden sm:inline">
-                    {user.business_name || user.full_name}
+                    {vendor?.business_name || user.full_name}
                   </span>
                 </div>
               )}
@@ -373,7 +379,7 @@ const VendorProfile = () => {
           ) : (
             <div className="space-y-6">
               {/* Profile header card */}
-              <div className="bg-white border border-border rounded-2xl p-6 sm:p-8">
+              <div className="min-w-0 bg-white border border-border rounded-2xl p-6 sm:p-8">
                 <div className="flex flex-col sm:flex-row sm:items-start gap-5">
                   <div
                     className="relative w-16 h-16 flex-shrink-0 cursor-pointer group"
@@ -430,7 +436,7 @@ const VendorProfile = () => {
 
               <div className="grid lg:grid-cols-2 gap-6">
                 {/* Business Info */}
-                <div className="bg-white border border-border rounded-2xl p-6">
+                <div className="min-w-0 bg-white border border-border rounded-2xl p-6">
                   <div className="flex items-center gap-2 mb-5">
                     <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
                       <Building2 className="h-4 w-4 text-primary" />
@@ -458,7 +464,7 @@ const VendorProfile = () => {
                 </div>
 
                 {/* Edit Profile */}
-                <div className="bg-white border border-border rounded-2xl p-6">
+                <div className="min-w-0 bg-white border border-border rounded-2xl p-6">
                   <div className="flex items-center gap-2 mb-5">
                     <div className="w-8 h-8 bg-accent/10 rounded-lg flex items-center justify-center">
                       <Settings className="h-4 w-4 text-accent" />
@@ -551,8 +557,8 @@ const VendorProfile = () => {
                 </div>
 
                 {/* Service Photos Gallery */}
-                <div className="bg-white border border-border rounded-2xl p-6 lg:col-span-2">
-                  <div className="flex items-center justify-between mb-5">
+                <div className="min-w-0 bg-white border border-border rounded-2xl p-6 lg:col-span-2">
+                  <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
                         <ImageIcon className="h-4 w-4 text-primary" />
@@ -625,8 +631,8 @@ const VendorProfile = () => {
                 </div>
 
                 {/* Service Items */}
-                <div id="services" className="bg-white border border-border rounded-2xl p-6 lg:col-span-2 scroll-mt-28">
-                  <div className="flex items-center justify-between mb-5">
+                <div id="services" className="min-w-0 bg-white border border-border rounded-2xl p-6 lg:col-span-2 scroll-mt-28">
+                  <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 bg-accent/10 rounded-lg flex items-center justify-center">
                         <Package className="h-4 w-4 text-accent" />
@@ -647,6 +653,15 @@ const VendorProfile = () => {
                   {showAddItem && (
                     <form onSubmit={handleItemSubmit} className="mb-5 p-4 bg-muted/40 rounded-xl border border-border space-y-3">
                       <p className="text-sm font-semibold">{editingItem ? "Edit Item" : "New Service Item"}</p>
+                      <div className="grid grid-cols-3 gap-1.5" role="radiogroup" aria-label="How is it priced?">
+                        {[["unit", "Per unit", "Plates, hours, trays"], ["package", "Package", "One bundle, e.g. Gold"], ["quote", "On request", "You send a quote"]].map(([v, l, h]) => (
+                          <button key={v} type="button" role="radio" aria-checked={itemForm.pricing_type === v}
+                            onClick={() => setItemForm((f) => ({ ...f, pricing_type: v }))}
+                            className={`rounded-lg border px-2 py-2 text-left ${itemForm.pricing_type === v ? "border-primary bg-[hsl(var(--primary-pale))]" : "border-border bg-white"}`}>
+                            <span className="block text-xs font-semibold">{l}</span><span className="block text-[11px] text-muted-foreground">{h}</span>
+                          </button>
+                        ))}
+                      </div>
                       <div className="grid sm:grid-cols-2 gap-3">
                         <div>
                           <label className="text-xs font-medium text-muted-foreground mb-1 block">Item Name *</label>
@@ -658,19 +673,19 @@ const VendorProfile = () => {
                             required
                           />
                         </div>
-                        <div>
+                        {itemForm.pricing_type === "unit" && <div>
                           <label className="text-xs font-medium text-muted-foreground mb-1 block">Unit Label *</label>
                           <select
                             value={itemForm.unit_label}
                             onChange={(e) => setItemForm((f) => ({ ...f, unit_label: e.target.value }))}
                             className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           >
-                            {["each", "per head", "per plate", "per table", "per hour", "per day", "flat rate"].map((l) => (
+                            {["each", "per head", "per plate", "per guest", "per tray", "per table", "per hour", "per day", "per set", "flat rate"].map((l) => (
                               <option key={l} value={l}>{l}</option>
                             ))}
                           </select>
-                        </div>
-                        <div>
+                        </div>}
+                        {itemForm.pricing_type !== "quote" && <div>
                           <label className="text-xs font-medium text-muted-foreground mb-1 block">Price (₦) *</label>
                           <Input
                             type="number"
@@ -682,17 +697,35 @@ const VendorProfile = () => {
                             className="h-9 text-sm"
                             required
                           />
-                        </div>
+                        </div>}
+                        {itemForm.pricing_type === "unit" && <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-xs font-medium text-muted-foreground mb-1 block">Minimum</label>
+                            <Input inputMode="numeric" value={itemForm.min_quantity} onChange={(e) => setItemForm((f) => ({ ...f, min_quantity: e.target.value.replace(/\D/g, "") }))} className="h-9 text-sm" />
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium text-muted-foreground mb-1 block">Maximum (optional)</label>
+                            <Input inputMode="numeric" value={itemForm.max_quantity} onChange={(e) => setItemForm((f) => ({ ...f, max_quantity: e.target.value.replace(/\D/g, "") }))} className="h-9 text-sm" />
+                          </div>
+                        </div>}
                         <div>
                           <label className="text-xs font-medium text-muted-foreground mb-1 block">Description (optional)</label>
                           <Input
-                            placeholder="Brief description"
+                            placeholder={itemForm.pricing_type === "quote" ? "What customers should tell you, e.g. guest count, theme" : "Brief description"}
                             value={itemForm.description}
                             onChange={(e) => setItemForm((f) => ({ ...f, description: e.target.value }))}
                             className="h-9 text-sm"
                           />
                         </div>
                       </div>
+                      {itemForm.pricing_type !== "quote" && (
+                        <div>
+                          <label className="text-xs font-medium text-muted-foreground mb-1 block">What's included (one per line, optional)</label>
+                          <textarea rows={3} value={itemForm.included} onChange={(e) => setItemForm((f) => ({ ...f, included: e.target.value }))}
+                            placeholder={"Setup and clean-up\n2 servers\nChafing dishes"}
+                            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+                        </div>
+                      )}
                       <div className="flex gap-2 justify-end">
                         <Button type="button" variant="ghost" size="sm" onClick={cancelItemForm} className="text-xs">Cancel</Button>
                         <Button
@@ -721,7 +754,7 @@ const VendorProfile = () => {
                       </div>
                       <p className="text-sm font-bold text-foreground mb-1">No service items yet</p>
                       <p className="text-xs text-muted-foreground mb-4 max-w-xs mx-auto leading-relaxed">
-                        Add your menu, packages, or individual services with pricing. Customers pick what they want when booking — you get paid based on their selection plus your base rate.
+                        Add your menu, packages, or individual services with pricing. Customers pick what they want when booking — you get paid for what they select. Your base rate is only charged if you have no service items.
                       </p>
                       <div className="flex flex-wrap justify-center gap-2 mb-4">
                         {["Rice ₦100k", "DJ Set ₦150k/hr", "Cocktails ₦3k/person", "Floral setup ₦50k"].map(ex => (
@@ -745,7 +778,7 @@ const VendorProfile = () => {
                               )}
                             </div>
                             <p className="text-xs text-muted-foreground">
-                              ₦{Number(item.unit_price).toLocaleString()} / {item.unit_label}
+                              {item.pricing_type === "quote" ? "Price on request" : item.pricing_type === "package" ? `₦${Number(item.unit_price).toLocaleString()} · package` : `₦${Number(item.unit_price).toLocaleString()} / ${item.unit_label}${(item.min_quantity || 1) > 1 ? ` · min ${item.min_quantity}` : ""}`}
                               {item.description && ` · ${item.description}`}
                             </p>
                           </div>
@@ -786,8 +819,37 @@ const VendorProfile = () => {
                   )}
                 </div>
 
+                {/* Availability calendar */}
+                <AvailabilitySettings />
+
+                {/* Delivery and preparation advance */}
+                <DeliveryAdvanceSettings vendor={vendor} />
+
+                {/* Cancellation policy */}
+                <div id="cancellation" className="min-w-0 bg-white border border-border rounded-2xl p-6 lg:col-span-2 scroll-mt-28">
+                  <div className="mb-4">
+                    <h2 className="text-base font-bold text-foreground">Cancellation policy</h2>
+                    <p className="text-xs text-muted-foreground">
+                      What customers get back if they cancel after you accept. You keep the rest for preparation already done.
+                      Changes apply to new bookings only.
+                    </p>
+                  </div>
+                  <PolicyPicker
+                    value={vendor?.cancellation_policy || "standard"}
+                    onChange={async (key) => {
+                      try {
+                        await api.vendors.updateMyVendor({ cancellation_policy: key } as any);
+                        queryClient.invalidateQueries({ queryKey: ["vendor-profile"] });
+                        toast.success("Cancellation policy updated for new bookings");
+                      } catch {
+                        toast.error("Couldn't update your policy. Please try again.");
+                      }
+                    }}
+                  />
+                </div>
+
                 {/* Payout Settings */}
-                <div id="payouts" className="bg-white border border-border rounded-2xl p-6 lg:col-span-2 scroll-mt-28">
+                <div id="payouts" className="min-w-0 bg-white border border-border rounded-2xl p-6 lg:col-span-2 scroll-mt-28">
                   <div className="flex items-center gap-2 mb-5">
                     <div className="w-8 h-8 bg-secondary/20 rounded-lg flex items-center justify-center">
                       <Banknote className="h-4 w-4 text-secondary-foreground" />

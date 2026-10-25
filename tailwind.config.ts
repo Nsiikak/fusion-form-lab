@@ -39,6 +39,16 @@ export default {
           DEFAULT: "hsl(var(--muted))",
           foreground: "hsl(var(--muted-foreground))",
         },
+        navy: {
+          DEFAULT: "hsl(var(--navy))",
+          foreground: "hsl(var(--navy-foreground))",
+        },
+        celebrate: {
+          DEFAULT: "hsl(var(--celebrate))",
+          foreground: "hsl(var(--celebrate-foreground))",
+          emerald: "hsl(var(--celebrate-emerald))",
+          gold: "hsl(var(--celebrate-gold))",
+        },
         accent: {
           DEFAULT: "hsl(var(--accent))",
           foreground: "hsl(var(--accent-foreground))",

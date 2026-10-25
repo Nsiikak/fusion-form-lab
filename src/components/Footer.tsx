@@ -57,7 +57,7 @@ export const Footer = () => {
               <img
                 src="/Plagohive.svg"
                 alt="Plagohive"
-                className="h-9 w-auto block object-contain"
+                className="w-auto block object-contain h-7 sm:h-8"
                 style={{ filter: "brightness(0) invert(1)" }}
                 loading="lazy"
               />

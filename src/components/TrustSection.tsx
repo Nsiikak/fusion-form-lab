@@ -21,17 +21,18 @@ const features = [
   },
   {
     icon: Award,
-    title: "Quality Guarantee",
-    description: "We stand behind every booking with our satisfaction guarantee and support team.",
+    title: "Fair dispute handling",
+    description: "If something goes wrong, report it before you confirm. Payment stays on hold while our team reviews both sides.",
     iconBg: "bg-[#EDE7F6] text-[#5E35B1]",
   },
 ];
 
+// Only claims that are true by design — no invented figures.
 const stats = [
-  { value: "98%",  label: "Satisfaction Rate" },
-  { value: "24/7", label: "Customer Support" },
-  { value: "50K+", label: "Happy Customers" },
-  { value: "100%", label: "Money-back Guarantee" },
+  { value: "Escrow", label: "Vendors paid only after you confirm" },
+  { value: "Paystack", label: "Secure, licensed payments" },
+  { value: "Verified", label: "Every vendor checked before listing" },
+  { value: "Refund", label: "In full if a vendor declines" },
 ];
 
 export const TrustSection = () => {

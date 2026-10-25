@@ -2,67 +2,76 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Plagohive design system — based on revamp.html
+/* Plagohive design system — "Warm Amber" (Oct 2026)
  * Typography: Sora (headings) + Plus Jakarta Sans (body)
- * Brand: Blue #1565C0 primary, Orange #F57C00 accent, Dark #0D1B2A
+ * Ground: warm cream #FFF7EC · Ink: navy #13213C · Primary: burnt amber #B8520B · Highlight: amber #E8770E
+ * Celebration accents (use sparingly — confetti, completion, verified badges):
+ *   plum #7A2E6E · emerald #0E8F6A · gold #F2B33D
  * All colors MUST be HSL for Tailwind token consumption.
  */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 215 51% 11%;            /* #0D1B2A */
+    --background: 35 100% 96%;            /* #FFF7EC warm cream */
+    --foreground: 219 52% 16%;            /* #13213C navy ink */
 
     --card: 0 0% 100%;
-    --card-foreground: 215 51% 11%;
+    --card-foreground: 219 52% 16%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 215 51% 11%;
+    --popover-foreground: 219 52% 16%;
 
-    /* Primary — Plagohive Blue #1565C0 */
-    --primary: 210 79% 42%;
+    /* Primary — burnt amber (buttons, links, active states). White text passes AA. */
+    --primary: 25 89% 38%;                /* #B8520B */
     --primary-foreground: 0 0% 100%;
-    --primary-glow: 210 79% 52%;          /* #1976D2 */
-    --primary-deep: 214 90% 34%;          /* #0D47A1 */
-    --primary-light: 214 100% 94%;        /* #E3F0FF */
-    --primary-pale: 214 100% 97%;         /* #F0F7FF */
+    --primary-glow: 26 88% 45%;           /* #D9660E */
+    --primary-deep: 24 90% 28%;           /* #8A3B07 */
+    --primary-light: 35 100% 89%;         /* #FFE7C7 */
+    --primary-pale: 35 100% 94%;          /* #FFF1DE */
 
-    /* Accent — Plagohive Orange #F57C00 */
-    --accent: 29 100% 48%;
+    /* Accent — bright amber for highlights, large text and decoration */
+    --accent: 29 89% 48%;                 /* #E8770E */
     --accent-foreground: 0 0% 100%;
-    --accent-deep: 19 100% 45%;           /* #E65100 */
-    --accent-mid: 30 99% 51%;             /* #FB8C00 */
-    --accent-light: 36 100% 94%;          /* #FFF3E0 */
+    --accent-deep: 24 90% 28%;
+    --accent-mid: 33 92% 55%;
+    --accent-light: 35 100% 89%;
 
-    /* Secondary kept as surface off-white */
-    --secondary: 220 14% 97%;             /* #F9FAFB */
-    --secondary-foreground: 215 51% 11%;
+    /* Navy — the brand's second colour (dark sections, strong buttons) */
+    --navy: 219 52% 16%;
+    --navy-foreground: 35 100% 96%;
 
-    --muted: 220 14% 97%;
-    --muted-foreground: 220 9% 46%;       /* #6B7280 */
+    /* Celebration jewel tones — use sparingly */
+    --celebrate: 308 45% 33%;             /* plum #7A2E6E */
+    --celebrate-foreground: 0 0% 100%;
+    --celebrate-emerald: 162 82% 31%;     /* #0E8F6A */
+    --celebrate-gold: 38 88% 59%;         /* #F2B33D */
 
-    --destructive: 0 84% 60%;
+    --secondary: 35 70% 93%;              /* #FBF0E1 */
+    --secondary-foreground: 219 52% 16%;
+
+    --muted: 35 70% 93%;
+    --muted-foreground: 220 14% 39%;      /* #555F73 — 4.5:1 on cream */
+
+    --destructive: 0 72% 48%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 214 86% 42% / 0.10;         /* rgba(21,101,192,.10) */
-    --input: 214 32% 91%;
-    --ring: 210 79% 42%;
+    --border: 33 62% 85%;                 /* #F3DDBF warm hairline */
+    --input: 33 45% 80%;
+    --ring: 29 89% 48%;
 
-    --radius: 0.75rem;
+    --radius: 0.875rem;
 
     /* Custom design tokens */
-    --gradient-brand: linear-gradient(90deg, hsl(210 79% 42%), hsl(29 100% 48%));
-    --gradient-hero: radial-gradient(ellipse 70% 60% at 80% 20%, hsl(210 79% 42% / 0.06) 0%, transparent 70%),
-                     radial-gradient(ellipse 50% 40% at 10% 80%, hsl(29 100% 48% / 0.05) 0%, transparent 60%),
-                     hsl(228 100% 98%);
-    --gradient-testimonial: linear-gradient(135deg, hsl(214 90% 34%) 0%, hsl(210 79% 42%) 55%, hsl(232 64% 31%) 100%);
+    --gradient-brand: linear-gradient(90deg, hsl(219 52% 16%), hsl(29 89% 48%));
+    --gradient-hero: hsl(35 100% 96%);
+    --gradient-testimonial: linear-gradient(135deg, hsl(219 52% 16%) 0%, hsl(219 45% 24%) 100%);
 
-    --shadow-sm: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
-    --shadow-md: 0 4px 16px rgba(0,0,0,.08), 0 1px 4px rgba(0,0,0,.04);
-    --shadow-lg: 0 12px 48px rgba(13,27,42,.12), 0 4px 16px rgba(13,27,42,.06);
-    --shadow-elevated: 0 8px 32px hsl(210 79% 42% / 0.12);
-    --shadow-primary: 0 2px 8px hsl(210 79% 42% / 0.25);
-    --shadow-primary-lg: 0 4px 16px hsl(210 79% 42% / 0.35);
+    --shadow-sm: 0 1px 3px rgba(19,33,60,.06), 0 1px 2px rgba(19,33,60,.04);
+    --shadow-md: 0 6px 18px -6px rgba(19,33,60,.14), 0 1px 4px rgba(19,33,60,.04);
+    --shadow-lg: 0 20px 40px -24px rgba(19,33,60,.35), 0 4px 16px rgba(19,33,60,.05);
+    --shadow-elevated: 0 18px 40px -22px rgba(180,80,10,.45);
+    --shadow-primary: 0 6px 16px -6px hsl(25 89% 38% / 0.45);
+    --shadow-primary-lg: 0 12px 28px -10px hsl(25 89% 38% / 0.5);
 
     --transition-smooth: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   }
@@ -99,7 +108,7 @@
   }
 
   .glass-input {
-    @apply bg-white/80 border-white/20 focus:border-primary/50 focus:ring-primary/20 backdrop-blur-sm transition-all duration-300;
+    @apply bg-white/80 border-input focus:border-primary/50 focus:ring-primary/20 backdrop-blur-sm transition-all duration-300;
   }
 
   .text-gradient-brand {
@@ -137,4 +146,43 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+
+/* ── Warm Amber brand utilities ───────────────────────────────────────────── */
+@layer utilities {
+  /* Honeycomb texture — the brand's own motif. Put on a relatively-positioned section. */
+  .bg-honeycomb {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='97' viewBox='0 0 56 97'%3E%3Cpath d='M28 0 56 16v32L28 64 0 48V16zM28 64v33' fill='none' stroke='%23F3C78F' stroke-width='1.2' opacity='.55'/%3E%3C/svg%3E");
+    background-size: 50px 87px;
+  }
+  .bg-honeycomb-dark {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='97' viewBox='0 0 56 97'%3E%3Cpath d='M28 0 56 16v32L28 64 0 48V16zM28 64v33' fill='none' stroke='%23FFFFFF' stroke-width='1' opacity='.12'/%3E%3C/svg%3E");
+    background-size: 50px 87px;
+  }
+}
+
+/* Confetti for celebration moments (booking confirmed). Pure CSS, no library. */
+@keyframes confetti-fall {
+  0%   { transform: translate3d(0, -20px, 0) rotate(0deg); opacity: 0; }
+  10%  { opacity: 1; }
+  100% { transform: translate3d(var(--drift, 20px), 320px, 0) rotate(var(--spin, 540deg)); opacity: 0; }
+}
+.confetti-piece {
+  position: absolute;
+  top: 0;
+  border-radius: 2px;
+  animation: confetti-fall var(--dur, 2.6s) cubic-bezier(.2,.6,.4,1) var(--delay, 0s) forwards;
+  will-change: transform, opacity;
+}
+@keyframes pop-in {
+  0%   { transform: scale(.4); opacity: 0; }
+  60%  { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); }
+}
+.animate-pop-in { animation: pop-in .5s cubic-bezier(.2,.8,.3,1.2) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .confetti-piece { animation: none; display: none; }
+  .animate-pop-in { animation: none; }
 }

@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime, date
 from decimal import Decimal
@@ -10,6 +10,7 @@ class EventBase(BaseModel):
     location: str
     description: Optional[str] = None
     total_budget: Optional[Decimal] = None
+    event_type: Optional[str] = Field(None, max_length=30)
 
 class EventCreate(EventBase):
     pass
@@ -21,9 +22,13 @@ class EventUpdate(BaseModel):
     description: Optional[str] = None
     total_budget: Optional[Decimal] = None
     status: Optional[EventStatus] = None
+    event_type: Optional[str] = Field(None, max_length=30)
+    checklist: Optional[dict] = None
 
 class EventResponse(EventBase):
     id: int
+    event_type: Optional[str] = None
+    checklist: Optional[dict] = None
     customer_id: int
     status: EventStatus
     created_at: datetime

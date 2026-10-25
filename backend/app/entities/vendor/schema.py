@@ -13,10 +13,16 @@ class VendorBase(BaseModel):
     location: str = Field(..., max_length=300)
     description: Optional[str] = Field(None, max_length=5000)
     starting_price: Decimal
-    service_fee_percentage: Optional[Decimal] = Field(None, ge=0, le=100)
     logistics_fee: Optional[Decimal] = Field(None, ge=0)
     business_size: BusinessSize
     registration_number: Optional[str] = Field(None, max_length=50)
+    cancellation_policy: Optional[str] = Field("standard", pattern="^(flexible|standard|strict)$")
+    base_state: Optional[str] = Field(None, max_length=40)
+    interstate_mode: Optional[str] = Field(None, pattern="^(none|flat|per_state)$")
+    interstate_fee: Optional[Decimal] = Field(None, ge=0)
+    state_fees: Optional[dict] = None
+    advance_mode: Optional[str] = Field(None, pattern="^(none|logistics|logistics_plus)$")
+    advance_percent: Optional[int] = Field(None, ge=0, le=30)
 
 
 class VendorCreate(VendorBase):
@@ -46,8 +52,14 @@ class VendorUpdate(BaseModel):
     location: Optional[str] = Field(None, max_length=300)
     description: Optional[str] = Field(None, max_length=5000)
     starting_price: Optional[Decimal] = None
-    service_fee_percentage: Optional[Decimal] = Field(None, ge=0, le=100)
     logistics_fee: Optional[Decimal] = Field(None, ge=0)
+    cancellation_policy: Optional[str] = Field(None, pattern="^(flexible|standard|strict)$")
+    base_state: Optional[str] = Field(None, max_length=40)
+    interstate_mode: Optional[str] = Field(None, pattern="^(none|flat|per_state)$")
+    interstate_fee: Optional[Decimal] = Field(None, ge=0)
+    state_fees: Optional[dict] = None
+    advance_mode: Optional[str] = Field(None, pattern="^(none|logistics|logistics_plus)$")
+    advance_percent: Optional[int] = Field(None, ge=0, le=30)
     business_size: Optional[BusinessSize] = None
     registration_number: Optional[str] = Field(None, max_length=50)
     bank_code: Optional[str] = Field(None, max_length=10)
@@ -64,6 +76,8 @@ class VendorPublicResponse(VendorBase):
     profile_image_url: Optional[str] = None
     gallery_images: Optional[list[str]] = None
     average_rating: Optional[float] = None
+    response_hours: Optional[float] = None
+    daily_capacity: Optional[int] = None
     # CAC verification (read-only metadata, no sensitive financial data)
     cac_verified_name: Optional[str] = None
     cac_verification_attempted: bool = False
@@ -80,6 +94,7 @@ class VendorResponse(VendorPublicResponse):
     bank_code: Optional[str] = None
     account_number: Optional[str] = None
     cac_id: Optional[str] = None
+    verification_note: Optional[str] = None  # admin's reason for rejection/suspension
 
 
 # ── List response — uses public schema ────────────────────────────────────────

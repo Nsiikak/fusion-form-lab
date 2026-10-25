@@ -1,3 +1,5 @@
+from typing import Optional
+from pydantic import BaseModel, Field
 import secrets
 import re
 from datetime import timedelta, datetime, timezone
@@ -6,7 +8,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.core.security import create_access_token, get_current_active_user, get_password_hash
+from app.core.security import create_access_token, get_current_active_user, get_password_hash, issue_tokens
 from app.core.config import ACCESS_TOKEN_EXPIRE_MINUTES
 from app.entities.user import schema
 from app.entities.user.service import UserService
@@ -129,10 +131,9 @@ async def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
     _clear_attempts(form_data.username)
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(data={"sub": user.email}, expires_delta=access_token_expires)
+    tokens = issue_tokens(user)
     _fire_and_forget(send_login_notification, user.email, user.full_name or user.email, user.role.value)
-    return {"access_token": access_token, "token_type": "bearer"}
+    return tokens
 
 
 @router.post("/login-json", response_model=schema.Token)
@@ -151,10 +152,9 @@ async def login_json(
             headers={"WWW-Authenticate": "Bearer"},
         )
     _clear_attempts(login_data.email)
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(data={"sub": user.email}, expires_delta=access_token_expires)
+    tokens = issue_tokens(user)
     _fire_and_forget(send_login_notification, user.email, user.full_name or user.email, user.role.value)
-    return {"access_token": access_token, "token_type": "bearer"}
+    return tokens
 
 
 @router.get("/me", response_model=schema.UserResponse)
@@ -173,11 +173,14 @@ async def forgot_password(
     """Request a password reset link. Always returns 200 to prevent email enumeration."""
     user = db.query(User).filter(User.email == request.email).first()
     if user:
+        import hashlib
+        from app.entities.user.reset_token import PasswordResetToken
         token = secrets.token_urlsafe(32)
-        _reset_tokens[token] = {
-            "email": user.email,
-            "expires_at": datetime.now(timezone.utc) + timedelta(minutes=_RESET_EXPIRES_MINUTES),
-        }
+        # one live link per user: older unused links stop working
+        db.query(PasswordResetToken).filter(PasswordResetToken.user_id == user.id, PasswordResetToken.used_at.is_(None)).delete()
+        db.add(PasswordResetToken(user_id=user.id, token_hash=hashlib.sha256(token.encode()).hexdigest(),
+                                  expires_at=datetime.now(timezone.utc) + timedelta(minutes=_RESET_EXPIRES_MINUTES)))
+        db.commit()
         from app.services.email import send_password_reset_email
         _fire_and_forget(send_password_reset_email, user.email, user.full_name or user.email, token)
     return {"message": "If that email is registered, a reset link has been sent."}
@@ -189,19 +192,81 @@ async def reset_password(
     db: Session = Depends(get_db)
 ):
     """Reset password using a valid token."""
-    entry = _reset_tokens.get(request.token)
+    import hashlib
+    from app.entities.user.reset_token import PasswordResetToken
     now = datetime.now(timezone.utc)
-    if not entry or now > entry["expires_at"]:
+    entry = db.query(PasswordResetToken).filter(
+        PasswordResetToken.token_hash == hashlib.sha256(request.token.encode()).hexdigest()).first()
+    expires = entry.expires_at if entry and entry.expires_at.tzinfo else (entry.expires_at.replace(tzinfo=timezone.utc) if entry else None)
+    if not entry or entry.used_at is not None or now > expires:
         raise HTTPException(status_code=400, detail="Reset link is invalid or has expired.")
 
     _validate_password_strength(request.new_password)
 
-    user = db.query(User).filter(User.email == entry["email"]).first()
+    user = db.query(User).filter(User.id == entry.user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found.")
+        raise HTTPException(status_code=400, detail="Reset link is invalid or has expired.")
 
     user.hashed_password = get_password_hash(request.new_password)
+    user.token_version = int(user.token_version or 0) + 1     # sign out every existing session
+    entry.used_at = now
     db.commit()
-    del _reset_tokens[request.token]
     _clear_attempts(user.email)
     return {"message": "Password updated successfully."}
+
+
+class ProfileUpdate(BaseModel):
+    full_name: Optional[str] = Field(None, min_length=2, max_length=120)
+    phone_number: Optional[str] = Field(None, max_length=20)
+
+
+@router.patch("/me")
+def update_me(body: ProfileUpdate, current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    """Update your own name or phone number. Phone numbers must be Nigerian mobile numbers."""
+    import re
+    user = db.query(User).filter(User.id == current_user.id).first()
+    if body.full_name:
+        user.full_name = body.full_name.strip()
+    if body.phone_number is not None:
+        digits = re.sub(r"[^\d+]", "", body.phone_number)
+        if digits.startswith("+234"):
+            digits = "0" + digits[4:]
+        elif digits.startswith("234"):
+            digits = "0" + digits[3:]
+        if not re.fullmatch(r"0[789][01]\d{8}", digits):
+            raise HTTPException(status_code=400, detail="Enter a Nigerian mobile number, e.g. 0803 123 4567")
+        user.phone_number = digits
+    db.commit()
+    db.refresh(user)
+    return {"id": user.id, "email": user.email, "full_name": user.full_name, "phone_number": user.phone_number,
+            "role": user.role.value}
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+@router.post("/refresh")
+def refresh_tokens(body: RefreshRequest, db: Session = Depends(get_db)):
+    """Swap a valid refresh token for fresh tokens (rotation), so people stay signed in for 30 days."""
+    from jose import JWTError, jwt
+    from app.core.config import ALGORITHM, SECRET_KEY
+    try:
+        payload = jwt.decode(body.refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Session expired. Please sign in again.")
+    if payload.get("typ") != "refresh":
+        raise HTTPException(status_code=401, detail="Session expired. Please sign in again.")
+    user = db.query(User).filter(User.email == payload.get("sub")).first()
+    if not user or not user.is_active or int(payload.get("tv", 0)) != int(user.token_version or 0):
+        raise HTTPException(status_code=401, detail="Session expired. Please sign in again.")
+    return issue_tokens(user)
+
+
+@router.post("/logout-all", status_code=204)
+def logout_everywhere(current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    """End every session on every device."""
+    user = db.query(User).filter(User.id == current_user.id).first()
+    user.token_version = int(user.token_version or 0) + 1
+    db.commit()
+    return None

@@ -1,3 +1,4 @@
+import { CATEGORIES as ALL_CATEGORIES, NIGERIAN_STATES } from "@/lib/categories";
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
@@ -52,7 +53,7 @@ const step1Schema = z.object({
   contact_name: z.string().min(1, "Contact name is required"),
   email: z.string().email("Invalid email address"),
   phone_number: z.string().min(1, "Phone number is required"),
-  category: z.enum(["catering", "decoration", "photography", "entertainment", "logistics", "venue"]),
+  category: z.string().refine((v) => ALL_CATEGORIES.some((c) => c.value === v), "Choose a category"),
   location: z.string().min(1, "Location is required"),
 });
 
@@ -62,10 +63,7 @@ const step2Schema = z.object({
     (val) => !isNaN(Number(val)) && Number(val) > 0,
     "Must be a valid positive number"
   ),
-  service_fee_percentage: z.string().optional().refine(
-    (val) => !val || (!isNaN(Number(val)) && Number(val) >= 0 && Number(val) <= 100),
-    "Must be between 0 and 100"
-  ),
+  base_state: z.string().min(1, "Choose the state you're based in"),
   logistics_fee: z.string().optional().refine(
     (val) => !val || (!isNaN(Number(val)) && Number(val) >= 0),
     "Must be a valid amount"
@@ -91,14 +89,7 @@ type Step1FormValues = z.infer<typeof step1Schema>;
 type Step2FormValues = z.infer<typeof step2Schema>;
 type Step3FormValues = z.infer<typeof step3Schema>;
 
-const CATEGORIES = [
-  { value: "catering", label: "Catering" },
-  { value: "decoration", label: "Decoration" },
-  { value: "photography", label: "Photography" },
-  { value: "entertainment", label: "Entertainment" },
-  { value: "logistics", label: "Logistics" },
-  { value: "venue", label: "Venue" },
-];
+const CATEGORIES = ALL_CATEGORIES.map((c) => ({ value: c.value, label: c.label }));
 
 const SectionDivider = ({ label }: { label: string }) => (
   <div className="flex items-center gap-3 my-2">
@@ -182,8 +173,8 @@ const VendorRegistration = () => {
     defaultValues: {
       description: "",
       starting_price: "",
-      service_fee_percentage: "",
       logistics_fee: "",
+      base_state: "",
       business_size: "small",
     },
   });
@@ -244,8 +235,8 @@ const VendorRegistration = () => {
         location: allData.location,
         description: allData.description,
         starting_price: Number(allData.starting_price),
-        service_fee_percentage: allData.service_fee_percentage ? Number(allData.service_fee_percentage) : undefined,
-        logistics_fee: allData.category === "logistics" && allData.logistics_fee ? Number(allData.logistics_fee) : undefined,
+        logistics_fee: allData.logistics_fee ? Number(allData.logistics_fee) : undefined,
+        base_state: allData.base_state || undefined,
         business_size: allData.business_size,
         registration_number: allData.registration_number || undefined,
         phone_number: allData.phone_number,
@@ -279,7 +270,7 @@ const VendorRegistration = () => {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <Link to="/">
-              <img src="/Plagohive.svg" alt="Plagohive" className="h-12 w-auto object-contain" />
+              <img src="/Plagohive.svg" alt="Plagohive" className="w-auto object-contain h-7 sm:h-8" />
             </Link>
             <Link to="/vendor-search">
               <Button variant="outline" className="border-primary/20 hover:bg-primary/5 hover:text-primary transition-colors">
@@ -524,47 +515,43 @@ const VendorRegistration = () => {
                       )}
                     />
 
-                    <FormField
-                      control={step2Form.control}
-                      name="service_fee_percentage"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Service Fee (%)</FormLabel>
-                          <FormControl>
-                            <div className="relative">
-                              <span className="absolute left-3 top-3 text-sm font-medium text-muted-foreground">%</span>
-                              <Input type="number" min="0" max="100" step="0.5" placeholder="e.g. 10" className="pl-8 h-11 glass-input" {...field} />
-                            </div>
-                          </FormControl>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Applied to all orders on top of product prices. For standalone providers (DJ, MC) leave blank — your base rate is your service fee.
-                          </p>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    {formData.step1?.category === "logistics" && (
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <FormField
+                        control={step2Form.control}
+                        name="base_state"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>State you're based in <span className="text-destructive">*</span></FormLabel>
+                            <FormControl>
+                              <select {...field} className="h-11 w-full rounded-md border border-input bg-white px-3 text-sm">
+                                <option value="">Choose state</option>
+                                {NIGERIAN_STATES.map((st) => <option key={st} value={st}>{st}</option>)}
+                              </select>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                       <FormField
                         control={step2Form.control}
                         name="logistics_fee"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Logistics / Delivery Fee (₦)</FormLabel>
+                            <FormLabel>Logistics fee within your state (₦)</FormLabel>
                             <FormControl>
                               <div className="relative">
                                 <Banknote className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
-                                <Input type="number" placeholder="e.g. 15000" className="pl-10 h-11 glass-input" {...field} />
+                                <Input type="number" min="0" placeholder="0 if included in your prices" className="pl-10 h-11 glass-input" {...field} />
                               </div>
                             </FormControl>
                             <p className="text-xs text-muted-foreground mt-1">
-                              Average fixed transport / delivery charge per booking.
+                              Transport, delivery and setup: one flat fee for anywhere in your state. Plagohive takes no commission on it. You can add fees for other states later in your profile.
                             </p>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
-                    )}
+                    </div>
 
                     <FormField
                       control={step2Form.control}
@@ -605,11 +592,11 @@ const VendorRegistration = () => {
                         },
                         {
                           type: "Caterer / Bar service",
-                          tip: "Set your lowest item price as the base rate (e.g. ₦10,000 for a parfait). Add a service fee % for volume-based charges. List menu items from your dashboard.",
+                          tip: "Set your lowest item price as the base rate, then list your menu items and packages from your dashboard. Build any service charge into your prices.",
                         },
                         {
-                          type: "Logistics / Delivery",
-                          tip: "Enter your average fixed delivery charge above. This helps customers understand transport costs upfront.",
+                          type: "Logistics",
+                          tip: "Your logistics fee covers transport and setup anywhere in your state. Customers see it at checkout, and you can add fees for other states in your profile.",
                         },
                       ].map(({ type, tip }) => (
                         <div key={type} className="flex gap-2.5 text-xs">
