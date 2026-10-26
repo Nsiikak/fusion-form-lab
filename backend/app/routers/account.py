@@ -120,3 +120,19 @@ def remove_favorite(vendor_id: int, current_user: User = Depends(get_current_act
     db.query(Favorite).filter(Favorite.user_id == current_user.id, Favorite.vendor_id == vendor_id).delete()
     db.commit()
     return None
+
+
+class DeleteAccountIn(BaseModel):
+    password: str = Field(..., min_length=1, max_length=200)
+
+
+@router.post("/delete")
+def request_account_deletion(body: DeleteAccountIn, current_user: User = Depends(get_current_active_user),
+                             db: Session = Depends(get_db)):
+    """Schedule the account for deletion. Signs out everywhere; signing in within the grace period cancels it."""
+    from app.entities.user.deletion import GRACE_DAYS, request_deletion
+    from app.services.email import _fire_and_forget, send_account_deletion_email
+    when = request_deletion(db, current_user, body.password)
+    _fire_and_forget(send_account_deletion_email, current_user.email, current_user.full_name or current_user.email,
+                     f"{when:%d %b %Y}")
+    return {"delete_on": when.isoformat(), "grace_days": GRACE_DAYS}

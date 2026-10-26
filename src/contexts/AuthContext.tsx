@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { api, tokenManager } from '@/lib/api';
+import { toast } from 'sonner';
 
 interface User {
   id: number;
@@ -67,9 +68,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (email: string, password: string): Promise<User> => {
     try {
-      await api.auth.login(email, password);
+      const tokens = await api.auth.login(email, password);
       const userData = await api.auth.getCurrentUser();
       setUser(userData);
+      if (tokens?.deletion_cancelled) toast.success("Welcome back! Your account deletion has been cancelled.");
       return userData;
     } catch (error: any) {
       throw new Error(error.response?.data?.detail || 'Login failed');

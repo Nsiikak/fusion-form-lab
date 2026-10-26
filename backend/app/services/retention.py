@@ -61,6 +61,8 @@ def run(db: Session) -> dict:
             stale += 1
     out["inactive_chats"] = stale
     db.commit()
+    from app.entities.user.deletion import erase_due
+    out["deleted_accounts"] = erase_due(db)   # grace period: ACCOUNT_DELETION_GRACE_DAYS (default 30)
     if any(out.values()):
         logger.info("Retention clean-up: %s", out)
     return out

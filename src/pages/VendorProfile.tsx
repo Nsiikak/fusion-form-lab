@@ -31,6 +31,7 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
+import DeleteAccountCard from "@/components/common/DeleteAccountCard";
 
 const VendorProfile = () => {
   const { user, logout } = useAuth();
@@ -974,6 +975,7 @@ const VendorProfile = () => {
               </div>
             </div>
           )}
+          <DeleteAccountCard className="mt-8" />
         </div>
       </main>
     </div>

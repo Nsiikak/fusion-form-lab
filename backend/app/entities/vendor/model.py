@@ -76,6 +76,7 @@ class Vendor(Base):
     verified_at = Column(DateTime(timezone=True), nullable=True)
     verified_by = Column(Integer, ForeignKey("users.id"), nullable=True)  # NULL = automatic (CAC match)
     is_active = Column(Boolean, default=True)
+    hidden_for_deletion = Column(Boolean, nullable=False, default=False, server_default="false")  # hidden because the owner asked to delete their account
     
     # Banking Details
     bank_code = Column(String, nullable=True)

@@ -20,6 +20,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import DashboardHeader from "@/components/common/DashboardHeader";
 import BookingTimeline from "@/components/common/BookingTimeline";
 import RefundAccountCard from "@/components/common/RefundAccountCard";
+import DeleteAccountCard from "@/components/common/DeleteAccountCard";
 import { ShowMoreButton, useShowMore } from "@/components/common/ShowMore";
 import AddonsPanel from "@/components/common/AddonsPanel";
 import EventChecklist from "@/components/common/EventChecklist";
@@ -760,6 +761,8 @@ const CustomerDashboard = () => {
 
           {/* Recommended Vendors */}
           <RecommendedVendors />
+
+          <DeleteAccountCard className="mt-12" />
 
           <CancelBookingDialog
             booking={cancelBooking}

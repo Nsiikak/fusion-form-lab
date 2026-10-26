@@ -14,6 +14,7 @@ from app.entities.user import schema
 from app.entities.user.service import UserService
 from app.entities.user.model import User
 from app.services.email import send_welcome_email, send_login_notification, _fire_and_forget
+from app.entities.user.deletion import cancel_deletion
 
 router = APIRouter()
 
@@ -132,6 +133,7 @@ async def login(
         )
     _clear_attempts(form_data.username)
     tokens = issue_tokens(user)
+    tokens["deletion_cancelled"] = cancel_deletion(db, user)
     _fire_and_forget(send_login_notification, user.email, user.full_name or user.email, user.role.value)
     return tokens
 
@@ -153,6 +155,7 @@ async def login_json(
         )
     _clear_attempts(login_data.email)
     tokens = issue_tokens(user)
+    tokens["deletion_cancelled"] = cancel_deletion(db, user)
     _fire_and_forget(send_login_notification, user.email, user.full_name or user.email, user.role.value)
     return tokens
 

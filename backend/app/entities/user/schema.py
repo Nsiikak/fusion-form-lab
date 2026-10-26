@@ -42,6 +42,7 @@ class Token(BaseModel):
     access_token: str
     token_type: str
     refresh_token: Optional[str] = None
+    deletion_cancelled: bool = False  # this sign-in cancelled a pending account deletion
 
 class TokenData(BaseModel):
     email: Optional[str] = None

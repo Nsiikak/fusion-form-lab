@@ -33,4 +33,8 @@ class User(Base):
     refund_account_updated_at = Column(DateTime(timezone=True), nullable=True)
     # Bumped on password reset / "sign out everywhere": every older token stops working
     token_version = Column(Integer, nullable=False, default=0, server_default="0")
+    # Account deletion: requested -> 30-day grace period (signing in cancels it) -> personal data
+    # anonymised by the daily retention job. The row itself stays so bookings/payments keep their history.
+    deletion_requested_at = Column(DateTime(timezone=True), nullable=True)
+    deleted_at = Column(DateTime(timezone=True), nullable=True)
 

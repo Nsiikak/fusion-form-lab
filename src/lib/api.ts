@@ -565,6 +565,8 @@ export const api = {
     deleteRefundAccount: async () => {
       await apiClient.delete("/api/account/refund-account");
     },
+    requestDeletion: async (password: string): Promise<{ delete_on: string; grace_days: number }> =>
+      (await apiClient.post("/api/account/delete", { password })).data,
   },
   documents: {
     /** Downloads a booking's PDF (receipt for customers, payout statement for vendors). */

@@ -318,6 +318,15 @@ def send_vendor_approved_email(email: str, full_name: str, business_name: str) -
         "Open my dashboard", "/vendor-dashboard")
 
 
+def send_account_deletion_email(email: str, full_name: str, delete_on: str) -> bool:
+    return send_notice_email(email, full_name, "Your Plagohive account will be deleted", "Account",
+        "Account deletion scheduled",
+        [f"We've received your request to delete your Plagohive account. It will be permanently deleted on {delete_on}.",
+         "Changed your mind? Just sign in before then and your account will be restored as it was.",
+         "Booking and payment records are kept (without your personal details) because the law requires us to keep financial records."],
+        "Sign in to keep my account", "/login")
+
+
 def send_password_reset_email(email: str, full_name: str, token: str) -> bool:
     return send_notice_email(email, full_name, "Reset your Plagohive password", "Security", "Reset your password",
         ["Tap the button below to choose a new password. The link works once and expires in 1 hour.",
