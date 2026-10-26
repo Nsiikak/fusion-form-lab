@@ -33,6 +33,10 @@ class MonoCACService:
             name = re.sub(suffix, "", name)
         return re.sub(r"[^a-z0-9\s]", "", name).strip()
 
+    def _bare_rc(self, rc_number: str) -> str:
+        """Strip an "RC"/"BN" prefix, spaces and punctuation: "RC-123 456" -> "123456"."""
+        return re.sub(r"[^0-9]", "", re.sub(r"^\s*(rc|bn)", "", rc_number, flags=re.I))
+
     def name_similarity(self, a: str, b: str) -> float:
         return SequenceMatcher(None, self._normalize(a), self._normalize(b)).ratio()
 
@@ -58,14 +62,15 @@ class MonoCACService:
             logger.error("Mono CAC search exception: %s", str(e))
             return []
 
-    def get_profile(self, rc_number: str) -> Optional[dict]:
+    def get_profile(self, cac_id: str) -> Optional[dict]:
         """
-        Fetch comprehensive company profile using RC number.
+        Fetch comprehensive company profile using Mono's CAC id (the "id" from search results,
+        not the RC number).
         Returns the profile dict or None on failure.
         """
         try:
             response = requests.get(
-                f"{self.BASE_URL}/profile/{rc_number}",
+                f"{self.BASE_URL}/profile/{cac_id}",
                 headers=self.headers,
                 timeout=10,
             )
@@ -127,11 +132,15 @@ class MonoCACService:
         # 1. Search by RC number (exact)
         matches = self.search(rc_number, exact=True)
 
-        # If no results with exact, try the profile endpoint directly
+        # If no results with exact, retry with the bare number ("RC 123456" -> "123456") as a
+        # fuzzy search, keeping only results whose RC number actually matches
         if not matches:
-            profile = self.get_profile(rc_number)
-            if profile:
-                matches = [profile]
+            bare_rc = self._bare_rc(rc_number)
+            if bare_rc:
+                matches = [
+                    m for m in self.search(bare_rc, exact=False)
+                    if self._bare_rc(str(m.get("rc_number") or "")) == bare_rc
+                ]
 
         if not matches:
             result["reason"] = f"RC number '{rc_number}' not found in CAC database"
