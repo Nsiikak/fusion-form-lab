@@ -23,7 +23,7 @@ from app.entities.booking.reductions import BookingReduction  # noqa: F401
 from app.entities.user.reset_token import PasswordResetToken  # noqa: F401
 from app.entities.audit import ChatAccessLog, ContactAttempt, NotificationLog  # noqa: F401
 from app.entities.support import Escalation, SupportNote  # noqa: F401
-# Schema changes are managed by Alembic — run: alembic upgrade head
+# Schema changes are managed by Alembic and applied on startup (init_db.run in lifespan)
 
 # Show INFO logs from the app (e.g. "Email sent to …") alongside uvicorn's own output.
 if not logging.getLogger().handlers:
@@ -88,7 +88,6 @@ async def _auto_release_loop() -> None:
                 lock_conn.close()
 
 
-@asynccontextmanager
 def _check_email_on_startup() -> None:
     """Say loudly at startup if email won't work, instead of failing silently per message."""
     from app.core.config import CORS_ORIGINS as _origins, FRONTEND_URL as _site
@@ -106,7 +105,11 @@ def _check_email_on_startup() -> None:
         logger.error("EMAIL: NOT WORKING — %s. Run `python check_email.py you@example.com` to test.", detail)
 
 
+@asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Create tables on an empty database / apply pending migrations before serving requests
+    from init_db import run as init_schema
+    await asyncio.to_thread(init_schema)
     asyncio.get_running_loop().run_in_executor(None, _check_email_on_startup)
     task = asyncio.create_task(_auto_release_loop())
     yield

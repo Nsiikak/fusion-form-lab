@@ -8,9 +8,7 @@ fi
 
 ENV="${ENVIRONMENT:-development}"
 
-# Apply any pending database migrations before starting the server
-echo "Running database migrations..."
-python init_db.py
+# Database tables/migrations are applied by the app itself on startup (init_db.run in main.py)
 
 if [ "$ENV" = "production" ]; then
     echo "Starting Plagohive API in PRODUCTION mode..."
