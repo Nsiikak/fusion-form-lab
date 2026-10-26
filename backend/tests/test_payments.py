@@ -81,7 +81,7 @@ def env(monkeypatch):
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     fake = FakePaystack()
-    for mod in ("app.entities.booking.service", "app.routers.booking", "app.routers.payments", "app.routers.account", "app.entities.booking.addons_service", "app.entities.booking.reductions"):
+    for mod in ("app.entities.booking.service", "app.routers.booking", "app.routers.payments", "app.routers.account", "app.entities.booking.addons_service", "app.entities.booking.reductions", "app.entities.wallet.service"):
         monkeypatch.setattr(f"{mod}.paystack_service", fake)
     sent = []
     monkeypatch.setattr(email_module, "_send", lambda *a, **k: sent.append(a) or True)
@@ -91,6 +91,7 @@ def env(monkeypatch):
     env_calls = []
     monkeypatch.setattr("app.entities.booking.notifications._fire_and_forget", record)
     monkeypatch.setattr("app.services.email._fire_and_forget", record)
+    monkeypatch.setattr("app.entities.wallet.notifications._fire_and_forget", record)
 
     db = SessionLocal()
     pw = get_password_hash("Passw0rd!")
@@ -306,28 +307,25 @@ def _complete(env, bid):
     return _status(env, bid, "completed", "cust")
 
 
-def test_completion_pays_vendor_net_of_commission_once(env):
+def _credited(env, kind="earning"):
+    """Wallet credits of a kind, oldest first: [(amount, booking_id)]."""
+    from app.entities.wallet.model import WalletEntry
+    env["db"].expire_all()
+    return [(e.amount, e.booking_id) for e in
+            env["db"].query(WalletEntry).filter(WalletEntry.kind == kind).order_by(WalletEntry.id).all()]
+
+
+def test_completion_credits_vendor_wallet_net_of_commission_once(env):
     bid = _paid_booking(env)
     assert _complete(env, bid).status_code == 200
-    assert env["fake"].transfers == [(Decimal("104000.00"), "RCP_123", f"PLG-PAYOUT-{bid}")]
-    # Transfer webhook finalises it
-    raw, h = _signed({"event": "transfer.success", "data": {"reference": f"PLG-PAYOUT-{bid}"}})
-    env["client"].post("/api/payments/webhook/paystack", content=raw, headers=h)
-    env["db"].expire_all()
-    assert env["db"].get(Booking, bid).payout_status == "paid"
-
-
-def test_failed_payout_is_recorded_and_retryable(env):
-    bid = _paid_booking(env)
-    env["fake"].fail_transfer = True
-    _complete(env, bid)
-    env["db"].expire_all()
-    b = env["db"].get(Booking, bid)
-    assert b.payout_status == "failed" and "Insufficient balance" in b.payout_error
-    env["fake"].fail_transfer = False
-    r = env["client"].post(f"/api/admin/bookings/{bid}/retry-payout", headers=env["adm"])
-    assert r.json()["payout_status"] == "processing"
-    assert len(env["fake"].transfers) == 1
+    assert env["fake"].transfers == []                       # nothing leaves until the vendor withdraws
+    assert _credited(env) == [(Decimal("104000.00"), bid)]
+    assert env["db"].get(Booking, bid).payout_status == "credited"
+    from app.entities.booking.service import BookingService
+    BookingService.initiate_payout(env["db"], env["db"].get(Booking, bid))   # settling again changes nothing
+    assert _credited(env) == [(Decimal("104000.00"), bid)]
+    w = env["client"].get("/api/vendors/me/wallet", headers=env["ven"]).json()
+    assert w["balance"] == 104000.0 and w["can_withdraw"] is True
 
 
 def test_paid_booking_cannot_be_deleted(env):

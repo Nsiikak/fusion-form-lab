@@ -42,6 +42,7 @@ import { useConfirm } from "@/components/common/ConfirmDialog";
 import { formatNaira } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { api } from "@/lib/api";
+import WalletCard from "@/components/common/WalletCard";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -394,6 +395,8 @@ const VendorDashboard = () => {
             );
           })()}
 
+          <WalletCard className="mb-6 sm:mb-8 animate-fade-in-up [animation-delay:150ms]" />
+
           {/* Quick Stats */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-8 sm:mb-12 animate-fade-in-up [animation-delay:200ms]">
             <Card className="bg-white border border-border p-4 sm:p-6 hover:shadow-[var(--shadow-elevated)] transition-all">
@@ -651,7 +654,7 @@ const VendorDashboard = () => {
                               <MessageCircle className="h-3.5 w-3.5 mr-1" />
                               Message
                             </Button>
-                            {["processing", "awaiting_otp", "paid"].includes(booking.payout_status) && (
+                            {["processing", "awaiting_otp", "paid", "credited"].includes(booking.payout_status) && (
                               <Button
                                 size="sm"
                                 variant="ghost"
@@ -739,7 +742,7 @@ const VendorDashboard = () => {
 
               <Card className="bg-white border border-border p-6">
                 <h2 className="text-2xl font-bold mb-6 text-foreground">Payout Settings</h2>
-                <p className="text-muted-foreground mb-6">Enter your bank details to receive payouts automatically when you complete bookings.</p>
+                <p className="text-muted-foreground mb-6">Enter your bank details so you can withdraw your wallet balance to your bank.</p>
 
                 <form
                   onSubmit={async (e) => {
@@ -1081,6 +1084,7 @@ const VendorDashboard = () => {
                         awaiting_otp: "· transfer in progress",
                         processing: "· transfer in progress",
                         paid: "· paid out",
+                        credited: "· in your wallet",
                         failed: "· delayed — our team is on it",
                       }[detailBooking.payout_status as string]}
                     </span>

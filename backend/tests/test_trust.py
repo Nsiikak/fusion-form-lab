@@ -8,7 +8,7 @@ from decimal import Decimal
 from app.entities.booking.model import Booking, BookingStatus
 from app.entities.booking.trust import TrustService
 from app.entities.vendor.incident import VendorIncident
-from tests.test_payments import _complete, _paid_booking, _status, env  # noqa: F401
+from tests.test_payments import _credited, _complete, _paid_booking, _status, env  # noqa: F401
 
 NOW = lambda: datetime.now(timezone.utc)  # noqa: E731
 
@@ -40,7 +40,7 @@ def test_standard_policy_10_days_out_splits_50_50(env):
     b = _b(env, bid)
     assert b.status == BookingStatus.CANCELLED and b.cancelled_by == "customer"
     assert env["fake"].refund_amounts[-1] == Decimal("57500.00")                 # partial refund
-    assert env["fake"].transfers[-1][0] == Decimal("51750.00")                   # vendor keeps 57,500 − 10%
+    assert _credited(env)[-1][0] == Decimal("51750.00")                        # vendor keeps 57,500 − 10%
     assert b.commission_amount == Decimal("5750.00")
 
 
@@ -56,7 +56,7 @@ def test_under_48_hours_no_refund_vendor_paid(env):
     assert p["refund_amount"] == 0
     env["client"].post(f"/api/bookings/{bid}/cancel", headers=env["cust"], json={})
     assert env["fake"].refunds == []
-    assert env["fake"].transfers[-1][0] == Decimal("103500.00")
+    assert _credited(env)[-1][0] == Decimal("103500.00")
 
 
 def test_full_refund_cases(env):
@@ -116,7 +116,7 @@ def test_owed_fees_are_recovered_from_next_payout(env):
     env["client"].post(f"/api/bookings/{bid}/vendor-cancel", headers=env["ven"], json={"reason": "Clash"})
     bid2 = _paid_booking(env)
     _complete(env, bid2)
-    assert env["fake"].transfers[-1][0] == Decimal("92500.00")           # 104,000 − 11,500
+    assert _credited(env)[-1][0] == Decimal("92500.00")                  # 104,000 − 11,500
     b2 = _b(env, bid2)
     assert b2.penalty_deducted == Decimal("11500.00")
     assert env["db"].query(VendorIncident).one().fee_remaining == 0

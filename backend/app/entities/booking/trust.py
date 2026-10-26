@@ -226,28 +226,18 @@ class TrustService:
 
     @staticmethod
     def release_advance(db: Session, booking: Booking) -> None:
-        """Send the agreed mobilisation advance once the vendor reconfirms (at most once)."""
+        """Credit the agreed mobilisation advance to the vendor's wallet once they reconfirm (at most once).
+        The vendor can withdraw it straight away."""
         if not booking.advance_amount or booking.advance_status == "paid" or booking.status != BookingStatus.CONFIRMED:
             return
         if _aware(booking.event_date) - _now() > ADVANCE_WINDOW:
-            return   # sent later by the countdown job, once the event is 3 days away
-        vendor = db.query(Vendor).filter(Vendor.id == booking.vendor_id).first()
-        if not vendor or not vendor.recipient_code:
-            booking.advance_status, booking.advance_error = "failed", "Vendor has no verified bank account"
-            db.commit()
-            return
-        from app.entities.booking import service as booking_service
-        from app.services.paystack import PaystackError
-        try:
-            booking_service.paystack_service.initiate_transfer(amount=money(booking.advance_amount), recipient_code=vendor.recipient_code,
-                                               reference=f"PLG-ADV-{booking.id}", reason=f"Mobilisation advance for booking #{booking.id}")
-            booking.advance_status, booking.advance_paid_at, booking.advance_error = "paid", _now(), None
-            db.commit()
-            _chat_note(db, booking, f"\u20a6{booking.advance_amount:,.2f} was released to the vendor for preparation. The rest stays held until you confirm the service.")
-        except (PaystackError, HTTPException) as exc:
-            booking.advance_status, booking.advance_error = "failed", str(exc)[:500]
-            db.commit()
-            logger.error("Advance transfer failed for booking %s: %s", booking.id, exc)
+            return   # credited later by the countdown job, once the event is 3 days away
+        from app.entities.wallet import service as wallet
+        wallet.credit(db, booking.vendor_id, booking.advance_amount, "advance", booking_id=booking.id,
+                      note=f"Advance for booking #{booking.id}")
+        booking.advance_status, booking.advance_paid_at, booking.advance_error = "paid", _now(), None
+        db.commit()
+        _chat_note(db, booking, f"\u20a6{booking.advance_amount:,.2f} was released to the vendor for preparation. The rest stays held until you confirm the service.")
 
     @staticmethod
     def check_in(db: Session, booking_id: int, user_id: int) -> Booking:

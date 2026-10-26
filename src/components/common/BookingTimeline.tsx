@@ -57,6 +57,7 @@ function nextLine(b: Props["booking"], role: Props["role"]): string | null {
         processing: "Payout is on its way to your bank account.",
         awaiting_otp: "Payout is on its way to your bank account.",
         failed: "Payout is delayed — our team is on it.",
+        credited: "Your payout is in your wallet. Withdraw it to your bank any time.",
         paid: null,
       }[b.payout_status || ""] ?? null;
     default:

@@ -1,5 +1,6 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import date
+from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
 from sqlalchemy.orm import Session
 from typing import Optional
@@ -350,6 +351,34 @@ def my_advance_eligibility(current_user: User = Depends(get_current_active_user)
         "logistics_plus": advance_eligible(db, v, "logistics_plus"),
         "requirements": {"logistics": {"completed": 3}, "logistics_plus": {"completed": 5, "account_days": 60}},
     }
+
+
+class WithdrawRequest(BaseModel):
+    amount: Optional[Decimal] = Field(None, gt=0)   # omit to withdraw the whole balance
+
+
+def _my_vendor(db: Session, user: User):
+    v = VendorService.get_vendor_by_user_id(db, user.id)
+    if not v:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vendor profile not found")
+    return v
+
+
+@router.get("/me/wallet")
+def my_wallet(current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    """Wallet balance, recent credits/debits and withdrawals."""
+    from app.entities.wallet import service as wallet
+    return wallet.summary(db, _my_vendor(db, current_user))
+
+
+@router.post("/me/withdrawals", status_code=status.HTTP_201_CREATED)
+def request_withdrawal(body: WithdrawRequest, current_user: User = Depends(get_current_active_user),
+                       db: Session = Depends(get_db)):
+    """Withdraw wallet money to the vendor's saved bank account (one Paystack transfer)."""
+    from app.entities.wallet import service as wallet
+    v = _my_vendor(db, current_user)
+    w = wallet.request_withdrawal(db, v, body.amount)
+    return {"withdrawal": wallet.withdrawal_view(w), "wallet": wallet.summary(db, v)}
 
 
 class AvailabilityUpdate(BaseModel):

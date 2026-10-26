@@ -96,6 +96,8 @@ ADMIN_ALERT_EMAILS = [e.strip() for e in os.getenv("ADMIN_ALERT_EMAILS", "").spl
 
 # Payouts above this amount (naira) wait for an admin to approve them in the dashboard.
 PAYOUT_APPROVAL_THRESHOLD = _Decimal(os.getenv("PAYOUT_APPROVAL_THRESHOLD", "100000"))
+# Smallest wallet withdrawal a vendor can request (naira)
+WITHDRAWAL_MINIMUM = _Decimal(os.getenv("WITHDRAWAL_MINIMUM", "100"))
 
 # ── Business details printed on receipts and payout statements ───────────────
 COMPANY_NAME = os.getenv("COMPANY_NAME", "Plagohive")

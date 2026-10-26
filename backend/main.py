@@ -23,6 +23,7 @@ from app.entities.booking.reductions import BookingReduction  # noqa: F401
 from app.entities.user.reset_token import PasswordResetToken  # noqa: F401
 from app.entities.audit import ChatAccessLog, ContactAttempt, NotificationLog  # noqa: F401
 from app.entities.support import Escalation, SupportNote  # noqa: F401
+from app.entities.wallet.model import WalletEntry, Withdrawal  # noqa: F401
 # Schema changes are managed by Alembic and applied on startup (init_db.run in lifespan)
 
 # Show INFO logs from the app (e.g. "Email sent to …") alongside uvicorn's own output.
@@ -73,6 +74,8 @@ async def _auto_release_loop() -> None:
                 await asyncio.to_thread(BookingService.expire_unpaid_checkouts, db)
                 await asyncio.to_thread(BookingService.auto_release_expired_bookings, db)
                 await asyncio.to_thread(BookingService.sync_pending_payouts, db)
+                from app.entities.wallet.service import sync_pending as _sync_withdrawals
+                await asyncio.to_thread(_sync_withdrawals, db)
                 from app.entities.booking.trust import TrustService
                 await asyncio.to_thread(TrustService.expire_unaccepted, db)
                 await asyncio.to_thread(TrustService.resolve_overdue_no_shows, db)

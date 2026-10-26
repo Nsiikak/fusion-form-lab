@@ -44,15 +44,17 @@ def _handle_event(event: str, data: dict) -> None:
                 logger.error("Webhook could not confirm booking %s: %s", booking.id, exc.detail)
 
         elif event in ("transfer.success", "transfer.failed", "transfer.reversed"):
+            from app.entities.wallet import service as wallet
+            if wallet.handle_transfer_event(db, event, data):
+                return
+            # Legacy: per-booking transfers sent before the wallet existed
             booking = db.query(Booking).filter(Booking.payout_reference == data.get("reference")).first()
             if not booking:
                 return
             if event == "transfer.success":
                 BookingService.mark_payout_paid(db, booking)
             else:
-                booking.payout_status = "failed"
-                booking.payout_error = f"Paystack {event}: {data.get('reason') or data.get('status') or ''}"[:1000]
-                db.commit()
+                BookingService.legacy_transfer_failed(db, booking)
 
         elif event.startswith("refund."):
             ref = data.get("transaction_reference") or (data.get("transaction") or {}).get("reference")

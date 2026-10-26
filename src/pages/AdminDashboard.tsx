@@ -22,6 +22,7 @@ import { ShowMoreButton, useShowMore } from "@/components/common/ShowMore";
 import MetricsPanel from "@/components/admin/MetricsPanel";
 import AuditPanel from "@/components/admin/AuditPanel";
 import TeamPanel from "@/components/admin/TeamPanel";
+import WithdrawalsPanel from "@/components/admin/WithdrawalsPanel";
 import ConversationViewer from "@/components/admin/ConversationViewer";
 import { api, AdminCase, AdminVendor, CaseType } from "@/lib/api";
 import { formatNaira } from "@/lib/utils";
@@ -46,23 +47,11 @@ const CASE_META: Record<Exclude<CaseType, null>, { label: string; tone: string; 
     icon: Undo2,
     help: "Customer cancelled after the vendor accepted. Decide who keeps the money.",
   },
-  payout_approval: {
-    label: "Approve payout",
-    tone: "bg-violet-500/10 text-violet-700 border-violet-200",
-    icon: ShieldCheck,
-    help: "Large payout held for your approval. The customer has confirmed the service.",
-  },
   awaiting_otp: {
     label: "Waiting for Paystack OTP",
     tone: "bg-sky-500/10 text-sky-700 border-sky-200",
     icon: Clock,
     help: "Paystack is holding this transfer until an OTP is entered. Finalise it in Paystack → Transfers, then press Check with Paystack (it also re-checks automatically every 15 minutes).",
-  },
-  failed_payout: {
-    label: "Payout failed",
-    tone: "bg-amber-500/10 text-amber-800 border-amber-200",
-    icon: Banknote,
-    help: "The vendor's transfer didn't go through. Fix the cause, then retry.",
   },
   refund_needs_details: {
     label: "Refund needs an account",
@@ -92,9 +81,8 @@ const AdminDashboard = () => {
   });
 
   const openCases =
-    (overview?.open_disputes ?? 0) + (overview?.refund_reviews ?? 0) +
-    (overview?.payouts_awaiting_approval ?? 0) + (overview?.payouts_awaiting_otp ?? 0) +
-    (overview?.failed_payouts ?? 0) + (overview?.failed_refunds ?? 0);
+    (overview?.open_disputes ?? 0) + (overview?.refund_reviews ?? 0) + (overview?.failed_refunds ?? 0);
+  const withdrawalsWaiting = (overview?.payouts_awaiting_approval ?? 0) + (overview?.payouts_awaiting_otp ?? 0);
 
   return (
     <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/20 via-background to-background">
@@ -139,14 +127,13 @@ const AdminDashboard = () => {
             <Tile
               icon={FileWarning} label="Other cases"
               value={overview ? openCases - overview.open_disputes : undefined}
-              hint={overview ? `${overview.payouts_awaiting_approval} to approve · ${overview.refund_reviews} refund · ${overview.failed_payouts + overview.failed_refunds} failed` : ""}
+              hint={overview ? `${overview.refund_reviews} refund decisions · ${overview.failed_refunds} failed refunds` : ""}
               onClick={() => setTab("cases")}
-              urgent={(overview?.payouts_awaiting_approval ?? 0) > 0}
             />
             <Tile
               icon={Wallet} label="Held for others"
               value={overview ? naira(overview.escrow_held) : undefined}
-              hint={overview ? `Our earnings so far: ${naira(overview.platform_earnings)}` : ""}
+              hint={overview ? `In vendor wallets: ${naira(overview.wallet_balances)} · Our earnings: ${naira(overview.platform_earnings)}` : ""}
             />
           </div>
 
@@ -154,6 +141,9 @@ const AdminDashboard = () => {
             <TabsList className="mb-6 w-full sm:w-auto overflow-x-auto justify-start">
               <TabsTrigger value="cases">
                 Cases {openCases > 0 && <CountPill n={openCases} />}
+              </TabsTrigger>
+              <TabsTrigger value="withdrawals">
+                Withdrawals {withdrawalsWaiting > 0 && <CountPill n={withdrawalsWaiting} />}
               </TabsTrigger>
               <TabsTrigger value="vendors">
                 Vendor verification {(overview?.vendors_pending ?? 0) > 0 && <CountPill n={overview!.vendors_pending} />}
@@ -166,6 +156,7 @@ const AdminDashboard = () => {
             </TabsList>
 
             <TabsContent value="cases"><CasesQueue /></TabsContent>
+            <TabsContent value="withdrawals"><WithdrawalsPanel /></TabsContent>
             <TabsContent value="vendors"><VendorQueue /></TabsContent>
             <TabsContent value="upcoming"><UpcomingBoard /></TabsContent>
             <TabsContent value="metrics"><MetricsPanel /></TabsContent>
@@ -235,11 +226,11 @@ const CaseCard = ({ c, readOnly = false }: { c: AdminCase; readOnly?: boolean })
   const meta = c.case_type ? CASE_META[c.case_type] : null;
   const Icon = meta?.icon ?? Scale;
 
-  const retry = async (kind: "payout" | "refund") => {
+  const retryRefund = async () => {
     setBusy(true);
     try {
-      await (kind === "payout" ? api.admin.retryPayout(c.id) : api.admin.retryRefund(c.id));
-      toast.success(kind === "payout" ? "Payout resent to Paystack" : "Refund resent to Paystack");
+      await api.admin.retryRefund(c.id);
+      toast.success("Refund resent to Paystack");
       refresh();
     } catch (e) {
       toast.error(errorText(e, "Retry failed"));
@@ -253,31 +244,11 @@ const CaseCard = ({ c, readOnly = false }: { c: AdminCase; readOnly?: boolean })
     try {
       const updated = await api.admin.syncPayout(c.id);
       if (updated.payout_status === "paid") toast.success("Paystack confirms the transfer was successful");
-      else if (updated.payout_status === "failed") toast.error("Paystack reports this transfer failed — you can retry it");
+      else if (updated.payout_status === "credited") toast.error("Paystack reports this transfer failed — the money is now in the vendor's wallet");
       else toast.info("Paystack is still waiting on this transfer");
       refresh();
     } catch (e) {
       toast.error(errorText(e, "Couldn't reach Paystack"));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const approvePayout = async () => {
-    const ok = await confirm({
-      title: `Send ${naira(c.payout_amount)} to ${c.vendor_name || "the vendor"}?`,
-      description: "The transfer goes to the vendor's verified bank account. This can't be undone.",
-      confirmText: "Approve & send",
-      cancelText: "Not yet",
-    });
-    if (!ok) return;
-    setBusy(true);
-    try {
-      await api.admin.approvePayout(c.id);
-      toast.success("Payout approved and sent to Paystack");
-      refresh();
-    } catch (e) {
-      toast.error(errorText(e, "Couldn't approve payout"));
     } finally {
       setBusy(false);
     }
@@ -315,7 +286,7 @@ const CaseCard = ({ c, readOnly = false }: { c: AdminCase; readOnly?: boolean })
             </blockquote>
           )}
 
-          {c.payout_error && (c.case_type === "failed_payout" || c.case_type === "awaiting_otp") && (
+          {c.payout_error && c.case_type === "awaiting_otp" && (
             <p className="text-sm bg-amber-50 border border-amber-200 rounded px-3 py-2">
               <span className="font-semibold">Paystack: </span>{c.payout_error}
               {!c.vendor_has_bank_account && " — ask the vendor to add their bank details in Profile → Payouts."}
@@ -362,25 +333,14 @@ const CaseCard = ({ c, readOnly = false }: { c: AdminCase; readOnly?: boolean })
               </Button>
             </div>
           )}
-          {!readOnly && c.case_type === "payout_approval" && (
-            <Button className="w-full bg-green-600 hover:bg-green-700 text-white" disabled={busy} onClick={approvePayout}>
-              {busy ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Banknote className="h-4 w-4 mr-2" />}
-              Approve {naira(c.payout_amount)} payout
-            </Button>
-          )}
           {!readOnly && c.case_type === "awaiting_otp" && (
             <Button variant="outline" className="w-full" disabled={busy} onClick={checkWithPaystack}>
               {busy ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
               Check with Paystack
             </Button>
           )}
-          {!readOnly && c.case_type === "failed_payout" && (
-            <Button className="w-full" disabled={busy} onClick={() => retry("payout")}>
-              {busy ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />} Retry payout
-            </Button>
-          )}
           {!readOnly && c.case_type === "failed_refund" && (
-            <Button className="w-full" disabled={busy} onClick={() => retry("refund")}>
+            <Button className="w-full" disabled={busy} onClick={retryRefund}>
               {busy ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />} Retry refund
             </Button>
           )}

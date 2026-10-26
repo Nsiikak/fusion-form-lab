@@ -3,7 +3,7 @@ from pydantic import BaseModel, EmailStr, Field
 
 Every route requires an admin user. Create one with:  python create_admin.py you@example.com
 """
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from math import ceil
 from typing import Optional
 
@@ -20,6 +20,8 @@ from app.entities.booking.schema import ResolveRequest
 from app.entities.booking.service import BookingService, serialize_booking
 from app.entities.user.model import User
 from app.entities.vendor.model import Vendor, VerificationStatus
+from app.entities.wallet import service as wallet
+from app.entities.wallet.model import WalletEntry, Withdrawal
 from app.services.email import _fire_and_forget, send_notice_email, send_vendor_approved_email
 
 router = APIRouter()
@@ -36,11 +38,11 @@ def require_admin(current_user: User = Depends(get_current_active_user)) -> User
 CASE_FILTER = or_(
     (Booking.status == BookingStatus.DISPUTED) & Booking.resolution.is_(None),
     Booking.refund_status.in_(["pending_review", "failed", "needs_details"]),
-    Booking.payout_status.in_(["failed", "awaiting_approval", "awaiting_otp"]),
+    Booking.payout_status == "awaiting_otp",   # legacy per-booking transfer
 )
 
-# Payout states where the vendor's share is still sitting in our Paystack balance
-UNPAID_PAYOUT = ["not_due", "awaiting_approval", "awaiting_otp", "processing", "failed"]
+# Legacy per-booking transfers whose money is still in our Paystack balance
+UNPAID_PAYOUT = ["awaiting_approval", "awaiting_otp", "failed"]
 ACTIVE = [BookingStatus.PENDING, BookingStatus.CONFIRMED, BookingStatus.AWAITING_CONFIRMATION, BookingStatus.DISPUTED]
 
 
@@ -53,20 +55,27 @@ def overview(db: Session = Depends(get_db), admin: User = Depends(require_admin)
         "open_disputes": count(db.query(func.count(Booking.id)).filter(
             Booking.status == BookingStatus.DISPUTED, Booking.resolution.is_(None))),
         "refund_reviews": count(db.query(func.count(Booking.id)).filter(Booking.refund_status == "pending_review")),
-        "failed_payouts": count(db.query(func.count(Booking.id)).filter(Booking.payout_status == "failed")),
+        # Withdrawals that failed this week (money went back to the vendor's wallet; shown for visibility)
+        "failed_payouts": count(db.query(func.count(Withdrawal.id)).filter(
+            Withdrawal.status == "failed", Withdrawal.failed_at >= datetime.now(timezone.utc) - timedelta(days=7))),
         "failed_refunds": count(db.query(func.count(Booking.id)).filter(
             Booking.refund_status.in_(["failed", "needs_details"]))),
-        "payouts_awaiting_approval": count(db.query(func.count(Booking.id)).filter(
-            Booking.payout_status == "awaiting_approval")),
-        "payouts_awaiting_otp": count(db.query(func.count(Booking.id)).filter(Booking.payout_status == "awaiting_otp")),
-        # Money we're holding for someone: full customer payment on live bookings, plus the
-        # vendor's share on settled bookings until their transfer actually lands.
+        "payouts_awaiting_approval": count(db.query(func.count(Withdrawal.id)).filter(
+            Withdrawal.status == "awaiting_approval")),
+        "payouts_awaiting_otp": count(db.query(func.count(Withdrawal.id)).filter(Withdrawal.status == "awaiting_otp"))
+            + count(db.query(func.count(Booking.id)).filter(Booking.payout_status == "awaiting_otp")),
+        # Money we're holding for someone: full customer payment on live bookings, vendors' wallet
+        # balances, withdrawals not yet landed, and legacy per-booking payouts not yet landed.
         "escrow_held": float(
             count(db.query(func.coalesce(func.sum(Booking.customer_total), 0)).filter(
                 Booking.paid_at.isnot(None), Booking.status.in_(ACTIVE)))
+            + count(db.query(func.coalesce(func.sum(WalletEntry.amount), 0)))
+            + count(db.query(func.coalesce(func.sum(Withdrawal.amount), 0)).filter(Withdrawal.status.in_(wallet.IN_FLIGHT)))
             + count(db.query(func.coalesce(func.sum(Booking.payout_amount), 0)).filter(
-                Booking.paid_out == True, Booking.payout_status.in_(UNPAID_PAYOUT)))  # noqa: E712
+                Booking.paid_out == True, or_(Booking.payout_status.in_(UNPAID_PAYOUT),  # noqa: E712
+                                              (Booking.payout_status == "processing") & Booking.payout_reference.isnot(None))))
         ),
+        "wallet_balances": float(count(db.query(func.coalesce(func.sum(WalletEntry.amount), 0)))),
         # Commission + customer fee on every booking where the vendor's payout has been triggered
         "platform_earnings": float(count(db.query(
             func.coalesce(func.sum(func.coalesce(Booking.commission_amount, 0) + func.coalesce(Booking.platform_fee, 0)), 0)
@@ -260,7 +269,7 @@ def list_cases(db: Session = Depends(get_db), admin: User = Depends(require_admi
         .all()
     )
     # Disputes first — they block both parties
-    priority = {"dispute": 0, "refund_review": 1, "payout_approval": 2, "failed_payout": 3,
+    priority = {"dispute": 0, "refund_review": 1,
                 "refund_needs_details": 4, "awaiting_otp": 5, "failed_refund": 6}
     return sorted((_case_row(b) for b in rows), key=lambda r: priority.get(r["case_type"], 9))
 
@@ -307,27 +316,67 @@ def resolve_case(
     return _case_row(booking)
 
 
-@router.post("/bookings/{booking_id}/approve-payout", response_model=dict)
-def approve_payout(booking_id: int, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
-    """Send a payout that was held because it's above PAYOUT_APPROVAL_THRESHOLD."""
-    booking = _load_booking(db, booking_id)
-    BookingService.approve_payout(db, booking)
-    return _case_row(booking)
-
-
 @router.post("/bookings/{booking_id}/sync-payout", response_model=dict)
 def sync_payout(booking_id: int, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
-    """Check a sent payout's status directly with Paystack."""
+    """Legacy per-booking transfer: check its status directly with Paystack."""
     booking = _load_booking(db, booking_id)
     BookingService.sync_payout(db, booking)
     return _case_row(booking)
 
 
-@router.post("/bookings/{booking_id}/retry-payout", response_model=dict)
-def retry_payout(booking_id: int, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
-    booking = _load_booking(db, booking_id)
-    BookingService.retry_payout(db, booking)
-    return _case_row(booking)
+# ── Vendor withdrawals ───────────────────────────────────────────────────────
+
+def _withdrawal_row(db: Session, w: Withdrawal) -> dict:
+    vendor = db.query(Vendor).filter(Vendor.id == w.vendor_id).first()
+    return {**wallet.withdrawal_view(w), "error": w.error, "vendor_id": w.vendor_id,
+            "vendor_name": vendor.business_name if vendor else None,
+            "wallet_balance": float(wallet.balance(db, w.vendor_id))}
+
+
+def _load_withdrawal(db: Session, withdrawal_id: int) -> Withdrawal:
+    w = db.query(Withdrawal).filter(Withdrawal.id == withdrawal_id).first()
+    if not w:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Withdrawal not found")
+    return w
+
+
+class RejectWithdrawal(BaseModel):
+    reason: str = Field(..., min_length=3, max_length=500)
+
+
+@router.get("/withdrawals", response_model=list[dict])
+def list_withdrawals(
+    status_filter: Optional[str] = Query(None, alias="status"),
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+):
+    q = db.query(Withdrawal)
+    if status_filter:
+        q = q.filter(Withdrawal.status.in_(status_filter.split(",")))
+    return [_withdrawal_row(db, w) for w in q.order_by(Withdrawal.created_at.desc()).limit(limit).all()]
+
+
+@router.post("/withdrawals/{withdrawal_id}/approve", response_model=dict)
+def approve_withdrawal(withdrawal_id: int, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+    """Send a withdrawal that was held because it's above PAYOUT_APPROVAL_THRESHOLD."""
+    return _withdrawal_row(db, wallet.approve(db, _load_withdrawal(db, withdrawal_id), admin.id))
+
+
+@router.post("/withdrawals/{withdrawal_id}/reject", response_model=dict)
+def reject_withdrawal(withdrawal_id: int, body: RejectWithdrawal, db: Session = Depends(get_db),
+                      admin: User = Depends(require_admin)):
+    """Decline a held withdrawal. The money goes back to the vendor's wallet."""
+    return _withdrawal_row(db, wallet.reject(db, _load_withdrawal(db, withdrawal_id), admin.id, body.reason))
+
+
+@router.post("/withdrawals/{withdrawal_id}/sync", response_model=dict)
+def sync_withdrawal(withdrawal_id: int, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+    """Check a withdrawal's transfer status directly with Paystack."""
+    w = _load_withdrawal(db, withdrawal_id)
+    wallet.sync(db, w)
+    return _withdrawal_row(db, w)
+
 
 
 @router.post("/bookings/{booking_id}/retry-refund", response_model=dict)

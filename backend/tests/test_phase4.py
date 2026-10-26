@@ -6,7 +6,7 @@ from decimal import Decimal
 from app.entities.booking.model import Booking, BookingStatus
 from app.entities.service_item.model import ServiceItem
 from app.entities.vendor.incident import VendorIncident
-from tests.test_payments import _paid_booking, _status, env  # noqa: F401
+from tests.test_payments import _credited, _paid_booking, _status, env  # noqa: F401
 
 NOW = lambda: datetime.now(timezone.utc)  # noqa: E731
 
@@ -99,12 +99,13 @@ def test_advance_released_at_reconfirm_and_deducted_from_payout(env):
     from app.entities.booking.trust import TrustService
     TrustService.run_countdown(env["db"])                            # released by the countdown job
     b = _b(env, bid)
-    assert b.advance_status == "paid" and env["fake"].transfers[-1] == (Decimal("27000.00"), "RCP_123", f"PLG-ADV-{bid}")
+    assert b.advance_status == "paid" and _credited(env, "advance") == [(Decimal("27000.00"), bid)]
     # complete → only the rest is paid out
     b.event_date = NOW() - timedelta(hours=2); env["db"].commit()
     _status(env, bid, "awaiting_confirmation", "ven")
     _status(env, bid, "completed", "cust")
-    assert env["fake"].transfers[-1][0] == Decimal("77000.00")        # 104,000 − 27,000
+    assert _credited(env)[-1][0] == Decimal("77000.00")               # 104,000 − 27,000
+    assert env["fake"].transfers == []                                # both sit in the wallet until withdrawn
 
 
 def test_vendor_cancel_after_advance_creates_debt(env):

@@ -183,7 +183,7 @@ def notify_resolution(db: Session, booking: Booking) -> None:
 
 
 def notify_payout_sent(db: Session, booking: Booking) -> None:
-    """Vendor: your money has landed — with the payout statement attached."""
+    """Vendor: your share is in your wallet (or, for legacy transfers, has landed) — statement attached."""
     from app.services.email import send_notice_email
     try:
         vendor = db.query(Vendor).filter(Vendor.id == booking.vendor_id).first()
@@ -197,6 +197,21 @@ def notify_payout_sent(db: Session, booking: Booking) -> None:
                             payout_statement_pdf(booking))]
         except Exception as exc:
             logger.error("Couldn't build payout statement for booking %s: %s", booking.id, exc)
+        if booking.payout_status == "credited":
+            _fire_and_forget(
+                send_notice_email, vendor_user.email, vendor_user.full_name or vendor_user.email,
+                f"₦{_fmt(booking.payout_amount)} added to your wallet for booking {_ref(booking)}",
+                "Earnings", f"₦{_fmt(booking.payout_amount)} is in your wallet",
+                [
+                    f"Booking {_ref(booking)} is settled and your share has been added to your Plagohive wallet.",
+                    f"Booking amount ₦{_fmt(booking.price)} − Plagohive commission ₦{_fmt(booking.commission_amount)} "
+                    f"= ₦{_fmt(booking.payout_amount)} for you.",
+                    "Withdraw to your bank any time from your dashboard. Your payout statement is attached.",
+                ],
+                "Withdraw now", "/vendor-dashboard",
+                attachments=attachments,
+            )
+            return
         _fire_and_forget(
             send_notice_email, vendor_user.email, vendor_user.full_name or vendor_user.email,
             f"You've been paid ₦{_fmt(booking.payout_amount)} for booking {_ref(booking)}",

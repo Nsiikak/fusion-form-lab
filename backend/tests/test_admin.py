@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from app.entities.booking.model import Booking, BookingStatus
 from app.entities.booking.service import BookingService
 from app.entities.vendor.model import VerificationStatus
-from tests.test_payments import FUTURE, _complete, _paid_booking, _status, env  # noqa: F401
+from tests.test_payments import _credited, FUTURE, _complete, _paid_booking, _status, env  # noqa: F401
 
 
 def _past_event(env, bid):
@@ -128,10 +128,10 @@ def test_resolve_dispute_with_release_pays_vendor_once(env):
     _dispute(env, bid)
     body = {"outcome": "release", "note": "Photos show the service was delivered."}
     r = env["client"].post(f"/api/admin/bookings/{bid}/resolve", headers=env["adm"], json=body)
-    assert r.json()["status"] == "completed" and r.json()["payout_status"] == "processing"
+    assert r.json()["status"] == "completed" and r.json()["payout_status"] == "credited"
     again = env["client"].post(f"/api/admin/bookings/{bid}/resolve", headers=env["adm"], json=body)
     assert again.status_code == 400
-    assert len(env["fake"].transfers) == 1 and env["fake"].refunds == []
+    assert len(_credited(env)) == 1 and env["fake"].refunds == []
 
 
 def test_late_cancellation_release_declines_refund(env):
@@ -142,7 +142,7 @@ def test_late_cancellation_release_declines_refund(env):
     r = env["client"].post(f"/api/admin/bookings/{bid}/resolve", headers=env["adm"],
                            json={"outcome": "release", "note": "Cancelled the day before; vendor had bought stock."})
     assert r.json()["refund_status"] == "declined" and r.json()["status"] == "cancelled"
-    assert len(env["fake"].transfers) == 1
+    assert len(_credited(env)) == 1
 
 
 def test_failed_refund_shows_up_and_can_be_retried(env):

@@ -122,7 +122,47 @@ export interface AdminOverview {
   payouts_awaiting_approval: number;
   payouts_awaiting_otp: number;
   escrow_held: number;
+  wallet_balances: number;
   platform_earnings: number;
+}
+
+export type WithdrawalStatus = "awaiting_approval" | "processing" | "awaiting_otp" | "paid" | "failed";
+
+export interface Withdrawal {
+  id: number;
+  amount: number;
+  status: WithdrawalStatus;
+  reference: string;
+  error: string | null;
+  created_at: string | null;
+  paid_at: string | null;
+  failed_at: string | null;
+}
+
+export interface AdminWithdrawal extends Withdrawal {
+  vendor_id: number;
+  vendor_name: string | null;
+  wallet_balance: number;
+}
+
+export interface WalletEntry {
+  id: number;
+  amount: number;
+  kind: "earning" | "advance" | "withdrawal" | "withdrawal_reversal";
+  booking_id: number | null;
+  note: string | null;
+  created_at: string | null;
+}
+
+export interface Wallet {
+  balance: number;
+  minimum: number;
+  approval_threshold: number;
+  has_bank_account: boolean;
+  can_withdraw: boolean;
+  pending_withdrawal: Withdrawal | null;
+  entries: WalletEntry[];
+  withdrawals: Withdrawal[];
 }
 
 export interface AdminVendor {
@@ -152,7 +192,7 @@ export interface AdminVendor {
 }
 
 export type CaseType =
-  | "dispute" | "refund_review" | "payout_approval" | "awaiting_otp" | "failed_payout" | "failed_refund"
+  | "dispute" | "refund_review" | "awaiting_otp" | "failed_refund"
   | "refund_needs_details" | null;
 
 export interface AdminCase {
@@ -365,6 +405,9 @@ export const api = {
       );
       return response.data;
     },
+    wallet: async (): Promise<Wallet> => (await apiClient.get("/api/vendors/me/wallet")).data,
+    withdraw: async (amount?: number) =>
+      (await apiClient.post("/api/vendors/me/withdrawals", amount ? { amount } : {})).data as { withdrawal: Withdrawal; wallet: Wallet },
     resolveAccount: async (account_number: string, bank_code: string) => {
       const response = await apiClient.get("/api/vendors/me/resolve-account", {
         params: { account_number, bank_code },
@@ -625,8 +668,6 @@ export const api = {
     history: async (): Promise<AdminCase[]> => (await apiClient.get("/api/admin/cases/history")).data,
     resolve: async (bookingId: number, outcome: "refund" | "release", note: string) =>
       (await apiClient.post(`/api/admin/bookings/${bookingId}/resolve`, { outcome, note })).data as AdminCase,
-    approvePayout: async (bookingId: number) =>
-      (await apiClient.post(`/api/admin/bookings/${bookingId}/approve-payout`)).data as AdminCase,
     upcoming: async (): Promise<UpcomingEvent[]> => (await apiClient.get("/api/admin/upcoming")).data,
     metrics: async (params: MetricsParams): Promise<Metrics> =>
       (await apiClient.get("/api/admin/metrics", { params })).data,
@@ -640,8 +681,14 @@ export const api = {
     },
     syncPayout: async (bookingId: number) =>
       (await apiClient.post(`/api/admin/bookings/${bookingId}/sync-payout`)).data as AdminCase,
-    retryPayout: async (bookingId: number) =>
-      (await apiClient.post(`/api/admin/bookings/${bookingId}/retry-payout`)).data as AdminCase,
+    withdrawals: async (status?: string): Promise<AdminWithdrawal[]> =>
+      (await apiClient.get("/api/admin/withdrawals", { params: status ? { status } : {} })).data,
+    approveWithdrawal: async (id: number) =>
+      (await apiClient.post(`/api/admin/withdrawals/${id}/approve`)).data as AdminWithdrawal,
+    rejectWithdrawal: async (id: number, reason: string) =>
+      (await apiClient.post(`/api/admin/withdrawals/${id}/reject`, { reason })).data as AdminWithdrawal,
+    syncWithdrawal: async (id: number) =>
+      (await apiClient.post(`/api/admin/withdrawals/${id}/sync`)).data as AdminWithdrawal,
     retryRefund: async (bookingId: number) =>
       (await apiClient.post(`/api/admin/bookings/${bookingId}/retry-refund`)).data as AdminCase,
   },

@@ -488,24 +488,15 @@ class BookingService:
     # ── Payouts ──────────────────────────────────────────────────────────────
     @staticmethod
     def initiate_payout(db: Session, booking: Booking) -> None:
-        """Start the vendor payout once a booking is settled in the vendor's favour.
+        """Settle a booking in the vendor's favour: credit their share to their wallet.
 
-        The paid_out flag is an atomic claim, so a booking can only ever start one payout.
-        Payouts above PAYOUT_APPROVAL_THRESHOLD wait for an admin (payout_status
-        "awaiting_approval"); smaller ones are sent straight away."""
-        from app.core import config
-
+        No money moves yet — the vendor withdraws to their bank when they choose (see
+        app.entities.wallet.service). The paid_out flag is an atomic claim, so a booking can only
+        ever be settled once."""
         claimed = (
             db.query(Booking)
             .filter(Booking.id == booking.id, Booking.paid_out == False)  # noqa: E712
-            .update(
-                {
-                    "paid_out": True,
-                    "payout_status": "processing",
-                    "payout_reference": f"PLG-PAYOUT-{booking.id}",
-                },
-                synchronize_session=False,
-            )
+            .update({"paid_out": True, "payout_status": "processing"}, synchronize_session=False)
         )
         db.commit()
         db.refresh(booking)
@@ -534,41 +525,28 @@ class BookingService:
             booking.payout_error = "Fully offset by late-cancellation fees owed"
             db.commit()
             return
-        needs_approval = money(booking.payout_amount) > config.PAYOUT_APPROVAL_THRESHOLD
-        booking.payout_status = "awaiting_approval" if needs_approval else "processing"
         db.commit()
-        db.refresh(booking)
-        if not needs_approval:
-            BookingService._send_transfer(db, booking)
+        from app.entities.wallet import service as wallet
+        wallet.credit(db, booking.vendor_id, booking.payout_amount, "earning", booking_id=booking.id,
+                      note=f"Booking #{booking.id}")
+        BookingService.mark_payout_credited(db, booking)
 
     @staticmethod
-    def approve_payout(db: Session, booking: Booking) -> None:
-        """Admin approval for a large payout (awaiting_approval → processing → transfer)."""
-        claimed = (
+    def mark_payout_credited(db: Session, booking: Booking) -> None:
+        """The vendor's share is in their wallet: record it, number the payout statement, email it."""
+        newly = (
             db.query(Booking)
-            .filter(Booking.id == booking.id, Booking.payout_status == "awaiting_approval")
-            .update({"payout_status": "processing"}, synchronize_session=False)
+            .filter(Booking.id == booking.id, Booking.payout_paid_at.is_(None))
+            .update({"payout_status": "credited", "payout_error": None,
+                     "payout_paid_at": datetime.now(timezone.utc)}, synchronize_session=False)
         )
         db.commit()
         db.refresh(booking)
-        if not claimed:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This payout isn't awaiting approval")
-        BookingService._send_transfer(db, booking)
-
-    @staticmethod
-    def retry_payout(db: Session, booking: Booking) -> None:
-        """Resend a failed payout. Reuses the same Paystack reference, which Paystack treats as
-        idempotent, so a vendor can never be paid twice."""
-        claimed = (
-            db.query(Booking)
-            .filter(Booking.id == booking.id, Booking.payout_status == "failed")
-            .update({"payout_status": "processing", "payout_error": None}, synchronize_session=False)
-        )
-        db.commit()
-        db.refresh(booking)
-        if not claimed:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only failed payouts can be retried")
-        BookingService._send_transfer(db, booking)
+        if newly:
+            BookingService._assign_number(db, booking, "payout_statement_number", "payout_statement_seq",
+                                          "PLG-PAY", booking.payout_paid_at)
+            from app.entities.booking.notifications import notify_payout_sent
+            notify_payout_sent(db, booking)
 
     # Paystack transfer status → our payout_status
     _TRANSFER_STATUS = {
@@ -579,8 +557,8 @@ class BookingService:
 
     @staticmethod
     def sync_payout(db: Session, booking: Booking) -> str:
-        """Ask Paystack where a sent transfer stands and update the booking. Covers the case
-        where the webhook never arrives (local development, or a missed delivery)."""
+        """Legacy: per-booking transfers sent before the wallet existed. Ask Paystack where one
+        stands and update the booking (covers a missed webhook)."""
         if booking.payout_status not in ("processing", "awaiting_otp") or not booking.payout_reference:
             return booking.payout_status
         try:
@@ -591,22 +569,42 @@ class BookingService:
         new_status = BookingService._TRANSFER_STATUS.get(data.get("status"), "processing")
         if new_status == "paid":
             BookingService.mark_payout_paid(db, booking)
-            return booking.payout_status
-        if new_status != booking.payout_status:
+        elif new_status == "failed":
+            BookingService.legacy_transfer_failed(db, booking)
+        elif new_status != booking.payout_status:
             booking.payout_status = new_status
-            booking.payout_error = (
-                f"Paystack transfer {data.get('status')}: {data.get('reason') or ''}"[:1000]
-                if new_status == "failed" else booking.payout_error if new_status == "awaiting_otp" else None
-            )
             db.commit()
             db.refresh(booking)
         return booking.payout_status
 
     @staticmethod
+    def legacy_transfer_failed(db: Session, booking: Booking) -> None:
+        """A legacy per-booking transfer failed: the money is still ours, so put it in the vendor's
+        wallet — they withdraw it like any other earning."""
+        if booking.payout_paid_at is not None:
+            return
+        booking.payout_reference = None
+        db.commit()
+        from app.entities.wallet import service as wallet
+        wallet.credit(db, booking.vendor_id, booking.payout_amount, "earning", booking_id=booking.id,
+                      note=f"Booking #{booking.id}")
+        BookingService.mark_payout_credited(db, booking)
+
+    @staticmethod
     def sync_pending_payouts(db: Session) -> int:
-        """Background task: reconcile every payout still waiting on Paystack."""
-        pending = db.query(Booking).filter(Booking.payout_status.in_(["processing", "awaiting_otp"])).all()
+        """Background task: reconcile every payout still waiting on Paystack, and finish any wallet
+        credit interrupted mid-way (claimed but not credited — crediting is idempotent)."""
         changed = 0
+        stranded = db.query(Booking).filter(Booking.paid_out == True, Booking.payout_status == "processing",  # noqa: E712
+                                            Booking.payout_reference.is_(None), Booking.payout_paid_at.is_(None)).all()
+        from app.entities.wallet import service as wallet
+        for booking in stranded:
+            wallet.credit(db, booking.vendor_id, booking.payout_amount, "earning", booking_id=booking.id,
+                          note=f"Booking #{booking.id}")
+            BookingService.mark_payout_credited(db, booking)
+            changed += 1
+        pending = db.query(Booking).filter(Booking.payout_status.in_(["processing", "awaiting_otp"]),
+                                           Booking.payout_reference.isnot(None)).all()
         for booking in pending:
             before = booking.payout_status
             if BookingService.sync_payout(db, booking) != before:
@@ -614,53 +612,6 @@ class BookingService:
         if changed:
             logger.info("Reconciled %d payout(s) with Paystack", changed)
         return changed
-
-    @staticmethod
-    def _send_transfer(db: Session, booking: Booking) -> None:
-        """Ask Paystack to transfer payout_amount and record what it says.
-
-        Paystack replies with the transfer's status:
-          "success" → paid
-          "otp"     → awaiting_otp (OTP is still switched on in the Paystack dashboard; the
-                      transfer won't move until someone enters the code there)
-          otherwise → processing, finalised later by the transfer.success / transfer.failed webhook
-        """
-        vendor = db.query(Vendor).filter(Vendor.id == booking.vendor_id).first()
-        error = None
-        new_status = "processing"
-        if not vendor or not vendor.recipient_code:
-            error = "Vendor has no verified bank account (recipient_code missing)"
-        else:
-            try:
-                result = paystack_service.initiate_transfer(
-                    amount=money(booking.payout_amount),
-                    recipient_code=vendor.recipient_code,
-                    reference=booking.payout_reference,
-                    reason=f"Payout for Booking #{booking.id}",
-                )
-                tx_status = (result or {}).get("status")
-                if tx_status == "otp":
-                    new_status = "awaiting_otp"
-                elif tx_status == "success":
-                    new_status = "paid"
-            except (PaystackError, HTTPException) as exc:
-                error = str(getattr(exc, "detail", exc))
-
-        if error:
-            logger.error("Payout failed for booking %s: %s", booking.id, error)
-            booking.payout_status = "failed"
-            booking.payout_error = error[:1000]
-        elif new_status == "paid":
-            BookingService.mark_payout_paid(db, booking)
-            return
-        else:
-            booking.payout_status = new_status
-            booking.payout_error = (
-                "Paystack is waiting for an OTP. Finalise it in the Paystack dashboard, or switch off "
-                "transfer OTP so payouts go out automatically." if new_status == "awaiting_otp" else None
-            )
-        db.commit()
-        db.refresh(booking)
 
     # ── Status changes ───────────────────────────────────────────────────────
     VALID_TRANSITIONS: dict = {
@@ -799,12 +750,8 @@ class BookingService:
             return "refund_review"
         if booking.refund_status == "needs_details":
             return "refund_needs_details"
-        if booking.payout_status == "awaiting_approval":
-            return "payout_approval"
-        if booking.payout_status == "awaiting_otp":
+        if booking.payout_status == "awaiting_otp":   # legacy per-booking transfer
             return "awaiting_otp"
-        if booking.payout_status == "failed":
-            return "failed_payout"
         if booking.refund_status == "failed":
             return "failed_refund"
         return None
@@ -819,7 +766,7 @@ class BookingService:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This booking has no open decision")
         if outcome not in ("refund", "release"):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Outcome must be 'refund' or 'release'")
-        if outcome == "refund" and booking.payout_status in ("processing", "paid", "awaiting_otp"):
+        if outcome == "refund" and booking.payout_status in ("processing", "paid", "awaiting_otp", "credited"):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Vendor has already been paid out")
 
         now = datetime.now(timezone.utc)

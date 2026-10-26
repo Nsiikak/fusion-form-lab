@@ -116,7 +116,7 @@ def test_support_can_assist_but_not_decide(env):
     assert "commission_amount" not in found[0] and "payout_amount" not in found[0]
     # no admin powers
     for method, path in [("get", "/api/admin/metrics"), ("get", "/api/admin/audit/chat-access"), ("get", "/api/admin/cases"),
-                         ("post", f"/api/admin/bookings/{bid}/resolve"), ("post", f"/api/admin/bookings/{bid}/approve-payout"),
+                         ("post", f"/api/admin/bookings/{bid}/resolve"), ("post", "/api/admin/withdrawals/1/approve"),
                          ("get", "/api/admin/escalations")]:
         assert getattr(c, method)(path, headers=sup).status_code in (403, 405, 422), path
     # customers and vendors can't use support tools

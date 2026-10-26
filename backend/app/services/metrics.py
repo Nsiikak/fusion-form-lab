@@ -60,8 +60,13 @@ def compute(db: Session, start: datetime, end: datetime) -> dict:
 
     no_shows = db.query(func.count(VendorIncident.id)).filter(
         VendorIncident.kind == "no_show", VendorIncident.created_at >= start, VendorIncident.created_at < end).scalar() or 0
-    payouts = db.query(func.coalesce(func.sum(Booking.payout_amount), 0)).filter(
-        Booking.payout_paid_at >= start, Booking.payout_paid_at < end).scalar() or 0
+    # Money that actually left for vendors' banks: wallet withdrawals, plus legacy per-booking transfers
+    from app.entities.wallet.model import Withdrawal
+    payouts = (db.query(func.coalesce(func.sum(Withdrawal.amount), 0)).filter(
+        Withdrawal.status == "paid", Withdrawal.paid_at >= start, Withdrawal.paid_at < end).scalar() or 0) + (
+        db.query(func.coalesce(func.sum(Booking.payout_amount), 0)).filter(
+            Booking.payout_status == "paid", Booking.payout_reference.isnot(None),
+            Booking.payout_paid_at >= start, Booking.payout_paid_at < end).scalar() or 0)
 
     active_vendors = db.query(func.count(Vendor.id)).filter(
         Vendor.is_active == True, Vendor.verification_status == VerificationStatus.APPROVED).scalar() or 0  # noqa: E712

@@ -85,7 +85,7 @@ async def get_vendor_stats(
     total_earnings = db.query(func.coalesce(func.sum(Booking.payout_amount), 0)).filter(
         Booking.vendor_id == vendor.id,
         Booking.status == BookingStatus.COMPLETED,
-        Booking.payout_status.in_(["processing", "paid"]),
+        Booking.payout_status.in_(["processing", "paid", "credited"]),
     ).scalar() or 0
 
     unique_customers = db.query(func.count(distinct(Booking.customer_id))).filter(

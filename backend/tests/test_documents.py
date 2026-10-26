@@ -58,24 +58,25 @@ def test_receipt_is_attached_to_the_payment_email(env):
 
 # ── Payout statements ────────────────────────────────────────────────────────
 
-def test_payout_statement_issued_and_emailed_when_money_lands(env):
+def test_payout_statement_issued_and_emailed_when_credited_to_wallet(env):
     bid = _paid_booking(env)
-    _complete(env, bid)
     assert env["client"].get(f"/api/bookings/{bid}", headers=env["ven"]).json()["payout_statement_number"] is None
-    _webhook(env, "transfer.success", {"reference": f"PLG-PAYOUT-{bid}"})
+    _complete(env, bid)
     env["db"].expire_all()
     b = env["db"].get(Booking, bid)
-    assert b.payout_status == "paid" and b.payout_statement_number.startswith("PLG-PAY-")
+    assert b.payout_status == "credited" and b.payout_statement_number.startswith("PLG-PAY-")
 
-    sent = [c for c in env["calls"] if c[0] == "send_notice_email" and "paid" in c[1][2]]
-    assert sent and sent[0][2]["attachments"][0][1][:4] == b"%PDF"
-    # webhook delivered twice → still one statement, one email
-    _webhook(env, "transfer.success", {"reference": f"PLG-PAYOUT-{bid}"})
-    assert len([c for c in env["calls"] if c[0] == "send_notice_email" and "paid" in c[1][2]]) == 1
+    sent = [c for c in env["calls"] if c[0] == "send_notice_email" and "wallet" in c[1][2]]
+    assert len(sent) == 1 and sent[0][2]["attachments"][0][1][:4] == b"%PDF"
+    # settling again → still one statement, one email
+    from app.entities.booking.service import BookingService
+    BookingService.initiate_payout(env["db"], b)
+    assert len([c for c in env["calls"] if c[0] == "send_notice_email" and "wallet" in c[1][2]]) == 1
 
     r = env["client"].get(f"/api/bookings/{bid}/payout-statement", headers=env["ven"])
     text = _text(r.content)
     assert "PAYOUT STATEMENT" in text and "NGN 104,000.00" in text and "NGN 11,000.00" in text
+    assert "CREDITED" in text and "wallet" in text
     assert "117,875" not in text            # customer fee isn't the vendor's business
     assert env["client"].get(f"/api/bookings/{bid}/payout-statement", headers=env["cust"]).status_code == 404
 

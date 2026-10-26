@@ -269,9 +269,11 @@ def payout_statement_pdf(booking) -> bytes:
     bank = BANK_NAMES.get(str(vendor.bank_code or ""), "Bank account")
     vendor_lines.append(f"{_esc(bank)} {_mask(vendor.account_number)}")
 
-    status = {"paid": ("PAID", "#15803D")}.get(booking.payout_status, ("PROCESSING", "#B45309"))
+    credited = booking.payout_status == "credited"   # wallet: credited now, withdrawn by the vendor later
+    status = {"paid": ("PAID", "#15803D"), "credited": ("CREDITED", "#15803D")}.get(booking.payout_status, ("PROCESSING", "#B45309"))
+    when = _date(booking.payout_paid_at, with_time=True) if booking.payout_paid_at else None
     story = _header("PAYOUT STATEMENT", booking.payout_statement_number or f"BKG-{booking.id}",
-                    f"Paid {_date(booking.payout_paid_at, with_time=True)}" if booking.payout_paid_at else "Payout in progress",
+                    (f"Credited to wallet {when}" if credited else f"Paid {when}") if when else "Payout in progress",
                     status)
     story += [_two_col("ISSUED BY", _company_block(), "PAID TO", Paragraph("<br/>".join(vendor_lines), S["body"])),
               Spacer(1, 14)]
@@ -298,6 +300,9 @@ def payout_statement_pdf(booking) -> bytes:
     story.append(_lines_table(rows, "Net payout", ngn(booking.payout_amount), show_qty=False))
     story.append(Spacer(1, 14))
     story.append(_facts([
+        ("Credited to", "Your Plagohive wallet (withdraw to your bank any time)"),
+        ("Amount credited", ngn(booking.payout_amount)),
+    ] if credited else [
         ("Paid to", f"{bank} {_mask(vendor.account_number)}"),
         ("Transfer reference", booking.payout_reference or "—"),
         ("Amount transferred", ngn(booking.payout_amount)),

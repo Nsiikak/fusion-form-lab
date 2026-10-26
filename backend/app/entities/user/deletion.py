@@ -46,6 +46,13 @@ def blockers(db: Session, user: User) -> list[str]:
         reasons.append("A refund is still being processed.")
     if vendor and db.query(Booking.id).filter(mine, Booking.payout_status.in_(_OPEN_PAYOUTS)).first():
         reasons.append("A payout to you hasn't gone through yet.")
+    if vendor:
+        from app.entities.wallet import service as wallet
+        from app.entities.wallet.model import Withdrawal
+        if db.query(Withdrawal.id).filter(Withdrawal.vendor_id == vendor.id, Withdrawal.status.in_(wallet.IN_FLIGHT)).first():
+            reasons.append("A withdrawal is still in progress.")
+        elif wallet.balance(db, vendor.id) > 0:
+            reasons.append("You still have money in your wallet. Withdraw it first.")
     return reasons
 
 

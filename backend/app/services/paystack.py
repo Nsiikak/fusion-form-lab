@@ -17,6 +17,10 @@ class PaystackError(Exception):
     """Raised when Paystack rejects a request or cannot be reached."""
 
 
+class PaystackUnreachable(PaystackError):
+    """No answer from Paystack (network error/timeout): the request may or may not have gone through."""
+
+
 def _mask(value: str, keep: int = 4) -> str:
     value = str(value or "")
     return "*" * max(len(value) - keep, 0) + value[-keep:]
@@ -49,7 +53,7 @@ class PaystackService:
             )
         except requests.RequestException as exc:
             logger.error("Paystack %s %s unreachable: %s", method, path.split("?")[0], exc)
-            raise PaystackError("Payment provider unreachable") from exc
+            raise PaystackUnreachable("Payment provider unreachable") from exc
 
     @staticmethod
     def _message(response: requests.Response) -> str:

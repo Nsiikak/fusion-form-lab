@@ -6,7 +6,7 @@ from decimal import Decimal
 from app.entities.booking.addon import BookingAddon
 from app.entities.booking.model import Booking
 from app.entities.booking.trust import TrustService
-from tests.test_payments import _complete, _paid_booking, _status, env  # noqa: F401
+from tests.test_payments import _credited, _complete, _paid_booking, _status, env  # noqa: F401
 
 NOW = lambda: datetime.now(timezone.utc)  # noqa: E731
 
@@ -81,7 +81,7 @@ def test_vendor_proposes_customer_pays_and_booking_grows(env):
     b.event_date = NOW() - timedelta(hours=1)
     env["db"].commit()
     _complete(env, bid)
-    assert env["fake"].transfers[-1][0] == Decimal("122000.00")
+    assert _credited(env)[-1][0] == Decimal("122000.00")
 
 
 def test_webhook_confirms_addon(env):

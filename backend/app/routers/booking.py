@@ -167,7 +167,7 @@ def download_payout_statement(
     allowed = current_user.role.value == "admin" or (vendor and booking and booking.vendor_id == vendor.id)
     if not booking or not allowed:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found")
-    if booking.payout_status not in ("processing", "awaiting_otp", "paid"):
+    if booking.payout_status not in ("processing", "awaiting_otp", "paid", "credited"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No payout statement yet — the payout hasn't been sent")
     from app.services.documents import payout_statement_pdf
     return _pdf(payout_statement_pdf(booking), f"Plagohive-payout-{booking.payout_statement_number or booking.id}.pdf")
